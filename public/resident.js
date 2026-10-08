@@ -41,20 +41,20 @@
     var ids = (t.samples || []).map(function (s) { return s.id; });
     $("tkQr").innerHTML = qrSvg("SMFC1|" + t.code + "|" + ids.join(","));
     var html = (t.samples || []).map(function (s) { return '<div class="sample">🎁 ' + esc(s.name) + "</div>"; }).join("");
-    if (t.noStock) html += '<div class="sample none">' + (ids.length ? "One of the samples" : "The sample") + " for your pet is out of stock today. Thank you for registering!</div>";
+    if (t.noStock) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
     $("tkMeta").textContent = (t.condoName || "") + " • " + (t.registeredAt || t.date || "");
     var box = main.querySelector(".ticket");
     if (t.status === "CLAIMED") {
       box.classList.add("claimed");
-      box.querySelector(".tkTop").innerHTML = '<span class="stamp">✓ SAMPLE RECEIVED</span>';
+      box.querySelector(".tkTop").innerHTML = '<span class="stamp">✓ FREE PACK RECEIVED</span>';
     }
     var again = document.createElement("div");
     again.className = "center";
     again.innerHTML = '<button type="button" class="linkBtn" id="another">Registering someone else on this phone? Tap here</button>';
     main.appendChild(again);
     $("another").onclick = function () {
-      if (!confirm("Close this ticket and register another person? (Please make sure this sample has been received.)")) return;
+      if (!confirm("Close this ticket and register another person? (Please make sure this free pack has been received.)")) return;
       try { localStorage.removeItem(TICKET_KEY); } catch (e) { }
       location.reload();
     };
@@ -178,7 +178,7 @@
       showTicket(r.ticket);
       return;
     }
-    btn.disabled = false; btn.textContent = "Get my FREE sample";
+    btn.disabled = false; btn.textContent = "Get my FREE NutriChunks / Majesty";
     err.hidden = false; err.textContent = r.message || "Your registration was not saved. Please try again.";
     if (r.error === "ALREADY_REGISTERED" || r.error === "BAD_MOBILE") main.querySelector('.q[data-q="mobile"]').classList.add("bad");
   }

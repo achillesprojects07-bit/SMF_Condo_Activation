@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
-<title>Free Pet Food Sample</title>
+<title>FREE NutriChunks or Majesty</title>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="app.css">
@@ -13,7 +13,7 @@
 <div class="app">
   <header class="top">
     <img class="brandmark" src="smf-logo.png" alt="San Miguel Foods">
-    <div class="brand"><h1>Free Pet Food Sample</h1><p id="condoLine">NutriChunks • Majesty</p></div>
+    <div class="brand"><h1>FREE NutriChunks or Majesty</h1><p id="condoLine">Dog food • Cat food</p></div>
   </header>
 
   <main id="main" class="content">
@@ -24,7 +24,7 @@
 <template id="formTpl">
   <div class="hero">
     <div class="heroTitle">Welcome, pet parent!</div>
-    <div class="heroSub">Answer a few short questions (about 1 minute), then show your ticket at the booth to receive a <b>FREE sample</b> for your pet.</div>
+    <div class="heroSub">Answer a few short questions (about 1 minute), then show your ticket at the booth to receive <b>FREE NutriChunks</b> (dog food) or <b>Majesty</b> (cat food) for your pet.</div>
   </div>
 
   <section class="q" data-q="consent">
@@ -34,7 +34,7 @@
       <button type="button" class="choice" data-v="YES">Yes, I agree</button>
       <button type="button" class="choice" data-v="NO">No</button>
     </div>
-    <div id="noConsent" class="warnbox" hidden>We need your consent to register you and give you a sample. You may change your answer at any time.</div>
+    <div id="noConsent" class="warnbox" hidden>We need your consent to register you and give you your free pack. You may change your answer at any time.</div>
   </section>
 
   <div id="afterConsent" hidden>
@@ -113,7 +113,7 @@
       </section>
       <section class="q" data-q="mobile">
         <div class="qTitle">Mobile number</div>
-        <div class="qSub">One sample per mobile number</div>
+        <div class="qSub">One free pack per mobile number</div>
         <input id="mobile" class="big" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="09171234567">
         <div id="mobileHint" class="hint" hidden>Please enter 11 digits starting with 09.</div>
       </section>
@@ -126,7 +126,7 @@
       </section>
 
       <div id="formError" class="errbox" hidden></div>
-      <button id="submit" type="button" class="btn primary huge">Get my FREE sample</button>
+      <button id="submit" type="button" class="btn primary huge">Get my FREE NutriChunks / Majesty</button>
     </div>
   </div>
 </template>
@@ -140,7 +140,7 @@
     <div class="tkSamples" id="tkSamples"></div>
     <div class="tkMeta" id="tkMeta"></div>
   </div>
-  <div class="helper center">Tip: take a screenshot of this ticket. Please keep this page open until you receive your sample.</div>
+  <div class="helper center">Tip: take a screenshot of this ticket. Please keep this page open until you receive your free pack.</div>
 </template>
 
 <script src="vendor/qrcode.js"></script>

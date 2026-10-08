@@ -252,14 +252,14 @@ function register_(p) {
   if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'We could not find this condo. Please scan the QR code at the booth again.' };
   var date = today_();
   if (!runningToday_(condo.CONDO_ID, date)) return { ok: false, error: 'NOT_TODAY', message: 'There is no sampling at this condo today.' };
-  if (p.consent !== 'YES') return { ok: false, error: 'NO_CONSENT', message: 'Your privacy consent is needed to receive a sample.' };
+  if (p.consent !== 'YES') return { ok: false, error: 'NO_CONSENT', message: 'Your privacy consent is needed to receive your free pack.' };
   var mobile = normMobile_(p.mobile);
   if (!/^09\d{9}$/.test(mobile)) return { ok: false, error: 'BAD_MOBILE', message: 'Please enter a valid mobile number (e.g. 09171234567).' };
 
   var regs = read_('REGISTRATIONS');
   for (var i = 0; i < regs.length; i++) {
     if (normMobile_(regs[i].MOBILE) === mobile) {
-      return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one sample is allowed per mobile number.' };
+      return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one free pack is allowed per mobile number.' };
     }
   }
 
