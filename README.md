@@ -25,7 +25,7 @@ Rules: one sample per mobile number for the whole activation. Dog: puppy -> Pupp
 1. New Google Sheet -> Extensions -> Apps Script -> paste `gateway/Code.gs` -> run `setupSheets` -> allow access.
 2. Deploy -> New deployment -> Web app, Execute as **Me**, Access **Anyone** -> copy the URL.
 3. Project Settings -> Script properties -> copy `GATEWAY_SECRET`.
-4. Cloudflare: deploy `worker/` (`npx wrangler deploy --config worker/wrangler.jsonc`) and set secrets
+4. Cloudflare: deploy `worker/` (`npx wrangler deploy`) and set secrets
    `GATEWAY_URL`, `GATEWAY_SECRET`, `SESSION_SECRET` (any long random text), `REPORT_PASSCODE` (8+ chars).
 5. Print one QR poster per condo pointing to `https://<worker-url>/?c=<CONDO CODE>`.
 
