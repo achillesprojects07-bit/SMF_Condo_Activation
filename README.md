@@ -31,3 +31,7 @@ Rules: one sample per mobile number for the whole activation. Dog: puppy -> Pupp
 
 ## Tests
 `npm test` — runs the real `Code.gs` on an in-memory sheet and the real Worker. `npm run dev` starts a local practice copy.
+
+## Short links (Cloudflare Pages project `nutrimajesty`, folder `shortlink/`)
+- nutrimajesty.pages.dev/rr → Rainbow Ridge, /lv → La Verti, /ba → BA app, /report → client report.
+- New condo: add a line to `shortlink/_redirects` and push.
