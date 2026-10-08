@@ -181,11 +181,17 @@ function products_() { return read_('PRODUCTS'); }
 function stockFor_(condoId, date, regs) {
   var out = {};
   products_().forEach(function (p) { out[p.PRODUCT_ID] = { allocated: 0, given: 0, reserved: 0 }; });
+  var found = false;
   read_('STOCK').forEach(function (s) {
     if (s.DATE === date && s.CONDO_ID.toUpperCase() === condoId.toUpperCase() && out[s.PRODUCT_ID]) {
       out[s.PRODUCT_ID].allocated += Number(s.ALLOCATED) || 0;
+      found = true;
     }
   });
+  // Practice mode on a day with no STOCK rows (e.g. BA training): use the normal daily allocation.
+  if (!found && String(settings_().TEST_MODE || '').toUpperCase() === 'YES') {
+    Object.keys(DAILY_STOCK_SEED).forEach(function (id) { if (out[id]) out[id].allocated = DAILY_STOCK_SEED[id]; });
+  }
   (regs || read_('REGISTRATIONS')).forEach(function (r) {
     if (r.DATE !== date || r.CONDO_ID.toUpperCase() !== condoId.toUpperCase()) return;
     if (r.STATUS === 'CLAIMED') {
@@ -439,6 +445,18 @@ function setupSheets() {
   var blank = b.getSheetByName('Sheet1');
   if (blank && blank.getLastRow() === 0 && b.getSheets().length > 1) b.deleteSheet(blank);
   Logger.log('Setup done. GATEWAY_SECRET = ' + props.getProperty('GATEWAY_SECRET'));
+}
+
+/** Run before the real event: removes all registrations and claims (training data) and turns practice mode OFF.
+    Photos in Drive are kept. */
+function clearTrainingData() {
+  ['REGISTRATIONS', 'REDEMPTIONS'].forEach(function (n) {
+    var sh = sheet_(n), last = sh.getLastRow();
+    if (last > 1) sh.deleteRows(2, last - 1);
+  });
+  var set = sheet_('SETTINGS'), vals = set.getDataRange().getValues();
+  for (var r = 1; r < vals.length; r++) if (vals[r][0] === 'TEST_MODE') set.getRange(r + 1, 2).setValue('NO');
+  Logger.log('Training data cleared. TEST_MODE = NO.');
 }
 
 function randomPin_() { return ('000' + Math.floor(Math.random() * 10000)).slice(-4); }

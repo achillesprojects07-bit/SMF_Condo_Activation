@@ -19,7 +19,8 @@ function makeSheet(name) {
         setFontWeight: function () { return this; }, setBackground: function () { return this; }, setNumberFormat: function () { return this; }
       };
     },
-    setFrozenRows: () => { }
+    setFrozenRows: () => { },
+    deleteRows: (start, n) => { rows.splice(start - 1, n); }
   };
   return sheet;
 }

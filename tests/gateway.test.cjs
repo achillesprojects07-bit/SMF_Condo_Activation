@@ -155,3 +155,15 @@ test("this app never points at the Barker's sheet", () => {
   assert.doesNotMatch(src, /1oNbOcEO3_78zUlTX-x5uhqqkIWxwGZGEG3PSpbYWsiI/);
   assert.doesNotMatch(src, /openById/);
 });
+
+test("training day (practice mode, no stock rows today) still gives samples; clearTrainingData resets", () => {
+  const g = loadGateway({ now: new Date("2026-10-09T01:00:00Z") }); // Friday, YES by default
+  const r = g.call("register", dogReg());
+  assert.equal(r.ok, true); assert.deepEqual(r.ticket.samples.map(s => s.id), ["NC_SMALL_BREED"]);
+  assert.equal(g.call("status", { condoId: "RR" }).stock.find(s => s.id === "NC_SMALL_BREED").left, 115);
+  g.ctx.clearTrainingData();
+  assert.equal(g.table("REGISTRATIONS").length, 0);
+  assert.equal(g.table("SETTINGS").find(x => x.KEY === "TEST_MODE").VALUE, "NO");
+  g.setNow("2026-10-10T02:00:00Z");
+  assert.equal(g.call("register", dogReg()).ok, true); // same mobile works again on the real day
+});
