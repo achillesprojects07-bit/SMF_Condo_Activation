@@ -1,5 +1,5 @@
 /* Look copied from the Barker's app: white until answered, green when answered, big tap buttons. */
-:root{--red:#e31920;--blue:#0066b3;--ink:#1c2733;--muted:#66717d;--line:#e8edf2;--soft:#f7f9fb;--green:#12b76a;--greenDark:#067647;--greenSoft:#ecfdf3;--warn:#a66300}
+:root{--red:#e31920;--blue:#0066b3;--smfRed:#e31920;--smfBlue:#0066b3;--ncOrange:#f47b20;--mjPurple:#6a2c91;--ink:#1c2733;--muted:#66717d;--line:#e8edf2;--soft:#f7f9fb;--green:#12b76a;--greenDark:#067647;--greenSoft:#ecfdf3;--warn:#a66300}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:#f3f6f8;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:16px}
@@ -11,7 +11,7 @@ body{margin:0;background:#f3f6f8;color:var(--ink);font-family:Inter,-apple-syste
 .pill{margin-left:auto;font-size:12px;font-weight:800;padding:7px 10px;border-radius:99px;background:#eaf7ef;color:var(--greenDark);white-space:nowrap}
 .pill.off{background:#fff4e5;color:var(--warn)}
 .content{padding:18px 16px 110px}
-.hero{background:#fff6d1;border:2px solid #f5b800;border-radius:16px;padding:14px 16px;margin-bottom:16px}
+.hero{background:#fff;border:2.5px solid var(--smfBlue);border-radius:16px;padding:14px 16px;margin-bottom:16px}
 .heroTitle{font-size:22px;font-weight:900}
 .heroNote{font-size:14px;color:#7a2e0e;background:#fffaeb;border:1.5px solid #fec84b;border-radius:10px;padding:8px 10px;margin-top:10px;line-height:1.35}
 .heroSub{font-size:15px;color:#3b4652;margin-top:4px;line-height:1.4}
@@ -58,14 +58,15 @@ input.big + input.big, .choices + input.big{margin-top:10px}
 .warnbox{background:#fffaeb;border:2px solid #fec84b;color:#7a2e0e;border-radius:14px;padding:12px 14px;font-size:15px;margin-top:12px;line-height:1.4}
 .okbox{background:var(--greenSoft);border:2px solid var(--green);color:var(--greenDark);border-radius:14px;padding:12px 14px;font-size:16px;font-weight:750;margin-top:12px}
 /* claim ticket */
-.ticket{border:3px dashed var(--greenDark);border-radius:20px;padding:18px 16px;text-align:center;background:#fff}
-.tkTop{font-size:16px;font-weight:800;color:var(--greenDark)}
+.ticket{border:3px dashed var(--smfBlue);border-radius:20px;padding:18px 16px;text-align:center;background:#fff}
+.tkTop{font-size:16px;font-weight:800;color:var(--smfBlue)}
 .tkCode{font-size:48px;font-weight:900;letter-spacing:3px;margin:6px 0 2px}
 .tkPets{font-size:17px;color:#344054;font-weight:650}
 .tkQr{margin:14px auto;width:220px;height:220px}
 .tkQr svg,.tkQr img{width:100%;height:100%}
 .tkSamples{display:grid;gap:8px;margin:6px 0 10px}
-.sample{background:#fff6d1;border:2px solid #f5b800;border-radius:12px;padding:10px;font-size:16px;font-weight:800;color:#5a3d00}
+.sample{background:#fff4ea;border:2px solid var(--ncOrange);border-radius:12px;padding:10px;font-size:16px;font-weight:800;color:#8a3c00}
+.sample.mj{background:#f5eefa;border-color:var(--mjPurple);color:var(--mjPurple)}
 .sample.none{background:#f2f4f7;border-color:#d0d5dd;color:#475467;font-weight:650}
 .tkMeta{font-size:13.5px;color:var(--muted)}
 .claimed{background:var(--greenSoft);border-color:var(--green)}
@@ -95,3 +96,6 @@ input.big + input.big, .choices + input.big{margin-top:10px}
 .recent div:first-child{border-top:0}
 .linkBtn{background:none;border:0;color:var(--blue);font-weight:750;font-size:15px;padding:8px 0;font-family:inherit}
 label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
+
+.free{color:var(--smfRed)}.nc{color:var(--ncOrange)}.mj{color:var(--mjPurple)}
+.heroTitle .free,.brand h1 .free{font-weight:900}

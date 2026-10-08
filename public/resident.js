@@ -40,7 +40,7 @@
     $("tkPets").textContent = [t.petNames, t.name].filter(Boolean).join(" • ");
     var ids = (t.samples || []).map(function (s) { return s.id; });
     $("tkQr").innerHTML = qrSvg("SMFC1|" + t.code + "|" + ids.join(","));
-    var html = (t.samples || []).map(function (s) { return '<div class="sample">🎁 ' + esc(s.name) + "</div>"; }).join("");
+    var html = (t.samples || []).map(function (s) { return '<div class="sample' + (/^MJ_/.test(s.id) ? " mj" : "") + '">🎁 <span class="free">FREE</span> ' + esc(s.name) + "</div>"; }).join("");
     if (t.noStock) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
     $("tkMeta").textContent = (t.condoName || "") + " • " + (t.registeredAt || t.date || "");
