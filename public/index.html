@@ -24,7 +24,8 @@
 <template id="formTpl">
   <div class="hero">
     <div class="heroTitle">Welcome, pet parent!</div>
-    <div class="heroSub">Answer a few short questions (about 1 minute), then show your ticket at the booth to receive <b>FREE NutriChunks</b> (dog food) or <b>Majesty</b> (cat food) for your pet.</div>
+    <div class="heroSub">Answer a few short questions (about 1 minute), then show your QR code at the booth to receive <b>FREE NutriChunks</b> (dog food) or <b>Majesty</b> (cat food) for your pet.</div>
+    <div class="heroNote"><b>NOTE:</b> Available while supplies last. One free pack per mobile number.</div>
   </div>
 
   <section class="q" data-q="consent">
@@ -133,14 +134,15 @@
 
 <template id="ticketTpl">
   <div class="ticket">
-    <div class="tkTop">Please show this ticket at the booth</div>
+    <div class="tkTop">Take a screenshot of this QR code and show it at the booth</div>
     <div class="tkCode" id="tkCode"></div>
     <div class="tkPets" id="tkPets"></div>
     <div class="tkQr" id="tkQr"></div>
     <div class="tkSamples" id="tkSamples"></div>
     <div class="tkMeta" id="tkMeta"></div>
   </div>
-  <div class="helper center">Tip: take a screenshot of this ticket. Please keep this page open until you receive your free pack.</div>
+  <div class="helper center">Please keep this page open until you receive your free pack.</div>
+  <div class="heroNote center" style="margin-top:10px"><b>NOTE:</b> Available while supplies last.</div>
 </template>
 
 <script src="vendor/qrcode.js"></script>

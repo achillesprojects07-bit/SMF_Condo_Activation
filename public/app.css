@@ -13,6 +13,7 @@ body{margin:0;background:#f3f6f8;color:var(--ink);font-family:Inter,-apple-syste
 .content{padding:18px 16px 110px}
 .hero{background:#fff6d1;border:2px solid #f5b800;border-radius:16px;padding:14px 16px;margin-bottom:16px}
 .heroTitle{font-size:22px;font-weight:900}
+.heroNote{font-size:14px;color:#7a2e0e;background:#fffaeb;border:1.5px solid #fec84b;border-radius:10px;padding:8px 10px;margin-top:10px;line-height:1.35}
 .heroSub{font-size:15px;color:#3b4652;margin-top:4px;line-height:1.4}
 .partHead{font-size:18px;font-weight:900;margin:22px 2px 10px}
 .q{border:2px solid #d0d5dd;background:#fff;border-radius:16px;padding:14px;margin-bottom:12px;transition:border-color .15s,background .15s}

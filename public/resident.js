@@ -54,7 +54,7 @@
     again.innerHTML = '<button type="button" class="linkBtn" id="another">Registering someone else on this phone? Tap here</button>';
     main.appendChild(again);
     $("another").onclick = function () {
-      if (!confirm("Close this ticket and register another person? (Please make sure this free pack has been received.)")) return;
+      if (!confirm("Register another person on this phone? (Please make sure this free pack has been received first.)")) return;
       try { localStorage.removeItem(TICKET_KEY); } catch (e) { }
       location.reload();
     };
