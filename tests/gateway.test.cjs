@@ -167,3 +167,11 @@ test("training day (practice mode, no stock rows today) still gives samples; cle
   g.setNow("2026-10-10T02:00:00Z");
   assert.equal(g.call("register", dogReg()).ok, true); // same mobile works again on the real day
 });
+
+test("PIN that lost its leading zero in the sheet still works", () => {
+  const g = fresh();
+  g.sheets.get("STAFF").rows.find(r => r[0] === "JA01")[2] = 267; // sheet turned "0267" into a number
+  assert.equal(g.call("staff_login", { staffCode: "JA01", pin: "0267" }).ok, true);
+  assert.equal(g.call("staff_login", { staffCode: "JA01", pin: "267" }).ok, true);
+  assert.equal(g.call("staff_login", { staffCode: "JA01", pin: "0268" }).error, "BAD_PIN");
+});

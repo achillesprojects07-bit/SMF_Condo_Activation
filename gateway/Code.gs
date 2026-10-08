@@ -307,7 +307,8 @@ function staffLogin_(p) {
   var code = String(p.staffCode || '').trim().toUpperCase(), pin = String(p.pin || '').trim();
   var staff = read_('STAFF').filter(function (s) { return s.STAFF_CODE.toUpperCase() === code && s.STATUS.toUpperCase() !== 'INACTIVE'; })[0];
   if (!staff) return { ok: false, error: 'BAD_STAFF', message: 'Mali ang Staff Code.' };
-  if (String(staff.PIN) !== pin) return { ok: false, error: 'BAD_PIN', message: 'Mali ang PIN.' };
+  var pad4 = function (v) { v = String(v).trim(); return /^\d{1,4}$/.test(v) ? ('0000' + v).slice(-4) : v; };
+  if (pad4(staff.PIN) !== pad4(pin)) return { ok: false, error: 'BAD_PIN', message: 'Mali ang PIN.' };
   var date = today_(), test = String(settings_().TEST_MODE || '').toUpperCase() === 'YES';
   var sched = read_('SCHEDULE').filter(function (s) { return s.STAFF_CODE.toUpperCase() === code && (s.DATE === date || test); });
   sched.sort(function (a, b) { return (a.DATE === date ? 0 : 1) - (b.DATE === date ? 0 : 1); });
