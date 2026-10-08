@@ -26,7 +26,7 @@ Rules: one sample per mobile number for the whole activation. Dog: puppy -> Pupp
 2. Deploy -> New deployment -> Web app, Execute as **Me**, Access **Anyone** -> copy the URL.
 3. Project Settings -> Script properties -> copy `GATEWAY_SECRET`.
 4. Cloudflare: deploy `worker/` (`npx wrangler deploy`) and set secrets
-   `GATEWAY_URL`, `GATEWAY_SECRET`, `SESSION_SECRET` (any long random text), `REPORT_PASSCODE` (8+ chars).
+   `GATEWAY_URL` (plain variable) and `GATEWAY_SECRET` (secret). Optional: `SESSION_SECRET`, `REPORT_PASSCODE`; without them the sign-in key is derived from GATEWAY_SECRET and the report passcode is read from SETTINGS > REPORT_PASSCODE in the sheet.
 5. Print one QR poster per condo pointing to `https://<worker-url>/?c=<CONDO CODE>`.
 
 ## Tests

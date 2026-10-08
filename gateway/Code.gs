@@ -70,6 +70,7 @@ function handle_(req) {
     case 'redeem': return withLock_(function () { return redeem_(p); });
     case 'status': return status_(p);
     case 'report': return report_();
+    case 'check_report_passcode': return checkReportPasscode_(p);
     default: throw new Error('Unsupported action: ' + action);
   }
 }
@@ -391,6 +392,12 @@ function status_(p) {
   };
 }
 
+function checkReportPasscode_(p) {
+  var want = String(settings_().REPORT_PASSCODE || '');
+  if (want.length < 8) return { ok: false, error: 'NOT_CONFIGURED', message: 'Report passcode is not set up yet (SETTINGS > REPORT_PASSCODE, 8+ characters).' };
+  return String(p.passcode || '') === want ? { ok: true } : { ok: false, error: 'BAD_PASSCODE', message: 'Wrong passcode.' };
+}
+
 function report_() {
   var strip = function (rows) { return rows.map(function (r) { var o = {}; Object.keys(r).forEach(function (k) { if (k !== '_row') o[k] = r[k]; }); return o; }); };
   return {
@@ -421,6 +428,7 @@ function setupSheets() {
   if (read_('BRANDS').length === 0) BRAND_SEED.forEach(function (r) { sheet_('BRANDS').appendRow([r[0], r[1], 'ACTIVE']); });
   if (read_('SETTINGS').length === 0) {
     sheet_('SETTINGS').appendRow(['TEST_MODE', 'YES', 'YES = practice on any date. Set to NO before the real event.']);
+    sheet_('SETTINGS').appendRow(['REPORT_PASSCODE', '', 'Passcode the client types to open the report page (8+ characters).']);
   }
   if (read_('CONDOS').length === 0) {
     sheet_('CONDOS').appendRow(['RR', 'Rainbow Ridge Condominium', 'M.L. Quezon Avenue, Brgy. San Miguel, Taguig City', 'Hallway between Apo and Banahaw Building', 'RR', 'ACTIVE']);

@@ -49,3 +49,19 @@ test("client report: passcode and numbers", async () => {
   assert.equal(r.brands.CAT.Whiskas, 1);
   assert.ok(r.days.find(d => d.condoId === "LV"));
 });
+
+test("only GATEWAY_URL + GATEWAY_SECRET set: sign-in works and the report passcode comes from the sheet", async () => {
+  const { server: s2, gw: g2 } = await startDevServer(8798, { minimalSecrets: true });
+  try {
+    const b2 = "http://localhost:8798", jj = async (p, o = {}) => { const r = await fetch(b2 + p, { ...o, headers: { "Content-Type": "application/json", ...(o.headers || {}) } }); return { status: r.status, body: await r.json() }; };
+    const login = await jj("/api/staff/login", { method: "POST", body: JSON.stringify({ staffCode: "JA01", pin: g2.pinOf("JA01") }) });
+    assert.equal(login.body.ok, true);
+    assert.equal((await jj("/api/status", { headers: { Authorization: "Bearer " + login.body.token } })).body.ok, true);
+    assert.equal((await jj("/api/report/login", { method: "POST", body: JSON.stringify({ passcode: "whatever1" }) })).status, 503);
+    g2.setSetting("REPORT_PASSCODE", "smfcondo2026");
+    assert.equal((await jj("/api/report/login", { method: "POST", body: JSON.stringify({ passcode: "wrongpass" }) })).status, 401);
+    const ok = await jj("/api/report/login", { method: "POST", body: JSON.stringify({ passcode: "smfcondo2026" }) });
+    assert.equal(ok.body.ok, true);
+    assert.equal((await jj("/api/report", { headers: { Authorization: "Bearer " + ok.body.token } })).body.ok, true);
+  } finally { s2.close(); }
+});

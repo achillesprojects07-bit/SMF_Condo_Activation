@@ -94,6 +94,8 @@ export function buildReport(raw) {
 }
 
 /* ---------- API ---------- */
+function sessionSecret(env) { return env.SESSION_SECRET || (env.GATEWAY_SECRET ? "session|" + env.GATEWAY_SECRET : ""); }
+
 export async function handleApi(request, env, deps = {}) {
   const url = new URL(request.url), path = url.pathname, method = request.method;
   const gw = (a, p) => gateway(env, a, p, deps.fetch || fetch);
@@ -128,20 +130,25 @@ export async function handleApi(request, env, deps = {}) {
       const b = await body(request) || {};
       const r = await gw("staff_login", { staffCode: String(b.staffCode || "").slice(0, 20), pin: String(b.pin || "").slice(0, 8) });
       if (!r.ok) return json(r, 401);
-      const token = await signToken(env.SESSION_SECRET, { role: "BA", staff: r.staff, condo: r.condo, exp: Date.now() + SESSION_HOURS * 3600e3 });
+      const token = await signToken(sessionSecret(env), { role: "BA", staff: r.staff, condo: r.condo, exp: Date.now() + SESSION_HOURS * 3600e3 });
       return json({ ...r, token });
     }
 
     if (path === "/api/report/login" && method === "POST") {
       if (limited("rep|" + ip, 10, 10 * 60 * 1000)) return json({ ok: false, error: "SLOW_DOWN", message: "Too many tries. Wait 10 minutes." }, 429);
-      const b = await body(request) || {}, pass = String(env.REPORT_PASSCODE || "");
-      if (pass.length < 8) return json({ ok: false, error: "NOT_CONFIGURED", message: "Report passcode is not set up yet." }, 503);
-      if (String(b.passcode || "") !== pass) return json({ ok: false, error: "BAD_PASSCODE", message: "Wrong passcode." }, 401);
-      return json({ ok: true, token: await signToken(env.SESSION_SECRET, { role: "CLIENT", exp: Date.now() + 12 * 3600e3 }) });
+      const b = await body(request) || {}, given = String(b.passcode || "").slice(0, 128), pass = String(env.REPORT_PASSCODE || "");
+      if (pass) {
+        if (given !== pass) return json({ ok: false, error: "BAD_PASSCODE", message: "Wrong passcode." }, 401);
+      } else {
+        // No Cloudflare secret: the passcode lives in the sheet (SETTINGS > REPORT_PASSCODE) and is checked there.
+        const r = await gw("check_report_passcode", { passcode: given });
+        if (!r.ok) return json({ ok: false, error: r.error || "BAD_PASSCODE", message: r.message || "Wrong passcode." }, r.error === "NOT_CONFIGURED" ? 503 : 401);
+      }
+      return json({ ok: true, token: await signToken(sessionSecret(env), { role: "CLIENT", exp: Date.now() + 12 * 3600e3 }) });
     }
 
     if (path === "/api/report" && method === "GET") {
-      const s = await readToken(env.SESSION_SECRET, bearer(request));
+      const s = await readToken(sessionSecret(env), bearer(request));
       if (!s || (s.role !== "CLIENT" && s.role !== "BA")) return json({ ok: false, error: "SIGN_IN", message: "Please sign in again." }, 401);
       if (s.role !== "CLIENT") return json({ ok: false, error: "FORBIDDEN", message: "Report is for the client only." }, 403);
       const raw = await gw("report", {});
@@ -150,7 +157,7 @@ export async function handleApi(request, env, deps = {}) {
     }
 
     // Everything below needs a BA sign-in.
-    const s = await readToken(env.SESSION_SECRET, bearer(request));
+    const s = await readToken(sessionSecret(env), bearer(request));
     if (!s || s.role !== "BA") return json({ ok: false, error: "SIGN_IN", message: "Mag-sign in ulit." }, 401);
 
     if (path === "/api/ticket" && method === "GET") return json(await gw("ticket", { code: url.searchParams.get("code") || "" }));

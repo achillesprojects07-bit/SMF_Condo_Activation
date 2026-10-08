@@ -11,7 +11,7 @@ const { loadGateway } = require("./fake-apps-script.cjs");
 export function startDevServer(port = 8788, opts = {}) {
   const gw = loadGateway({ now: opts.now });
   if (opts.testMode === false) gw.setSetting("TEST_MODE", "NO");
-  const env = { GATEWAY_URL: "https://script.example/exec", GATEWAY_SECRET: gw.secret, SESSION_SECRET: "dev-session-secret-0123456789", REPORT_PASSCODE: "client2026" };
+  const env = { GATEWAY_URL: "https://script.example/exec", GATEWAY_SECRET: gw.secret, ...(opts.minimalSecrets ? {} : { SESSION_SECRET: "dev-session-secret-0123456789", REPORT_PASSCODE: "client2026" }) };
   const fakeFetch = async (_url, init) => new Response(JSON.stringify(gw.post(JSON.parse(init.body))), { headers: { "Content-Type": "application/json" } });
   const root = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "public");
   const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json" };
