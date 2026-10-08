@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Condo Sampling Report</title>
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+<style>
+.app.wide{max-width:1100px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.3px;background:var(--soft);position:sticky;top:0}
+td.n,th.n{text-align:right}
+.scroll{overflow:auto;max-height:520px;border:1.5px solid var(--line);border-radius:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--soft);border-radius:14px;padding:12px}
+.kpi b{display:block;font-size:28px}
+.kpi span{font-size:13px;color:var(--muted)}
+.bar{height:10px;background:var(--green);border-radius:6px}
+.brandRow{display:grid;grid-template-columns:160px 1fr 40px;gap:10px;align-items:center;font-size:14px;padding:4px 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .btn{width:auto;padding:10px 14px;font-size:15px}
+.toolbar select{font-size:15px;padding:10px;border-radius:12px;border:1.5px solid #c5cfd9;font-family:inherit}
+h2{font-size:18px;margin:22px 0 10px}
+.photo a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="app wide">
+  <header class="top">
+    <img class="brandmark" src="smf-logo.png" alt="San Miguel Foods">
+    <div class="brand"><h1>Condo Sampling Report</h1><p>NutriChunks • Majesty</p></div>
+    <div class="pill" id="upd"></div>
+  </header>
+  <main id="main" class="content"></main>
+</div>
+<script src="report.js"></script>
+</body>
+</html>

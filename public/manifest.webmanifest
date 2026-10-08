@@ -1,0 +1,12 @@
+{
+  "name": "SMF Condo Sampling BA",
+  "short_name": "SMF Condo BA",
+  "start_url": "ba.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

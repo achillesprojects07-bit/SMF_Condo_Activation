@@ -1,0 +1,8 @@
+{
+  "name": "smf-condo-activation",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/gateway.test.cjs tests/worker.test.mjs",
+    "dev": "node tests/dev-server.mjs"
+  }
+}
