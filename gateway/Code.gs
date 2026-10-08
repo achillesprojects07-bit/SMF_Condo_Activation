@@ -38,7 +38,7 @@ var DAILY_STOCK_SEED = { NC_PUPPY_LAMB: 24, NC_MAINT_ADULT: 111, NC_SMALL_BREED:
 var BRAND_SEED = [
   ['Pedigree', 'DOG'], ['Vitality', 'DOG'], ['Top Breed', 'DOG'], ['Beef Pro', 'DOG'], ['Royal Canin', 'BOTH'],
   ['Whiskas', 'CAT'], ['Friskies', 'CAT'], ['Goodest', 'CAT'], ['Aozi', 'CAT'],
-  ['NutriChunks', 'DOG'], ['Majesty', 'CAT'], ['Lutong bahay / home-cooked', 'BOTH'], ['Iba pa / other', 'BOTH']
+  ['NutriChunks', 'DOG'], ['Majesty', 'CAT'], ['Home-cooked food', 'BOTH'], ['Other brand', 'BOTH']
 ];
 
 /* ---------------- entry points ---------------- */
@@ -235,7 +235,7 @@ function nextClaimCode_(condo, regs) {
 
 function condoInfo_(p) {
   var condo = findCondo_(p.condoId);
-  if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'Hindi makita ang condo. I-scan ulit ang QR sa booth.' };
+  if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'We could not find this condo. Please scan the QR code at the booth again.' };
   var date = today_();
   var brands = read_('BRANDS').filter(function (b) { return String(b.STATUS || 'ACTIVE').toUpperCase() !== 'INACTIVE'; })
     .map(function (b) { return { brand: b.BRAND, petType: b.PET_TYPE.toUpperCase() }; });
@@ -249,23 +249,23 @@ function condoInfo_(p) {
 
 function register_(p) {
   var condo = findCondo_(p.condoId);
-  if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'Hindi makita ang condo. I-scan ulit ang QR sa booth.' };
+  if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'We could not find this condo. Please scan the QR code at the booth again.' };
   var date = today_();
-  if (!runningToday_(condo.CONDO_ID, date)) return { ok: false, error: 'NOT_TODAY', message: 'Wala pang sampling sa condo na ito ngayong araw.' };
-  if (p.consent !== 'YES') return { ok: false, error: 'NO_CONSENT', message: 'Kailangan ang pahintulot (privacy consent) para makakuha ng sample.' };
+  if (!runningToday_(condo.CONDO_ID, date)) return { ok: false, error: 'NOT_TODAY', message: 'There is no sampling at this condo today.' };
+  if (p.consent !== 'YES') return { ok: false, error: 'NO_CONSENT', message: 'Your privacy consent is needed to receive a sample.' };
   var mobile = normMobile_(p.mobile);
-  if (!/^09\d{9}$/.test(mobile)) return { ok: false, error: 'BAD_MOBILE', message: 'Ilagay ang tamang mobile number (hal. 09171234567).' };
+  if (!/^09\d{9}$/.test(mobile)) return { ok: false, error: 'BAD_MOBILE', message: 'Please enter a valid mobile number (e.g. 09171234567).' };
 
   var regs = read_('REGISTRATIONS');
   for (var i = 0; i < regs.length; i++) {
     if (normMobile_(regs[i].MOBILE) === mobile) {
-      return { ok: false, error: 'ALREADY_REGISTERED', message: 'Naka-register na ang mobile number na ito. Isang sample lang bawat mobile number.' };
+      return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one sample is allowed per mobile number.' };
     }
   }
 
   var petType = String(p.petType || '').toUpperCase();
   var hasDog = petType === 'DOG' || petType === 'BOTH', hasCat = petType === 'CAT' || petType === 'BOTH';
-  if (!hasDog && !hasCat) return { ok: false, error: 'BAD_PET', message: 'Pumili: Dog, Cat, o Dog & Cat.' };
+  if (!hasDog && !hasCat) return { ok: false, error: 'BAD_PET', message: 'Please choose Dog, Cat, or Dog & Cat.' };
   var dog = p.dog || {}, cat = p.cat || {};
 
   var stock = stockFor_(condo.CONDO_ID, date, regs);

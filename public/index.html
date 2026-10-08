@@ -23,23 +23,23 @@
 
 <template id="formTpl">
   <div class="hero">
-    <div class="heroTitle">Hi, fur parent!</div>
-    <div class="heroSub">Sagutan lang ito (1 minuto), tapos ipakita ang ticket sa BA para sa <b>FREE sample</b> ng fur baby mo.</div>
+    <div class="heroTitle">Welcome, pet parent!</div>
+    <div class="heroSub">Answer a few short questions (about 1 minute), then show your ticket at the booth to receive a <b>FREE sample</b> for your pet.</div>
   </div>
 
   <section class="q" data-q="consent">
-    <div class="qTitle">Data Privacy</div>
-    <div class="privacy">San Miguel Foods would like to collect your name, mobile number and pet details for this condo sampling program, for documentation and reporting. Access is limited to authorized program personnel, in line with the Data Privacy Act of 2012.<br><br><b>Pumapayag ka ba?</b></div>
+    <div class="qTitle">Data privacy</div>
+    <div class="privacy">San Miguel Foods would like to collect your name, mobile number and pet details for this condo sampling program, for documentation and reporting. Access is limited to authorized program personnel, in line with the Data Privacy Act of 2012.<br><br><b>Do you agree?</b></div>
     <div class="choices two" data-name="consent">
       <button type="button" class="choice" data-v="YES">Yes, I agree</button>
       <button type="button" class="choice" data-v="NO">No</button>
     </div>
-    <div id="noConsent" class="warnbox" hidden>Okay lang! Pero kailangan ang pahintulot para makapag-register at makakuha ng sample. Pwede mong baguhin ang sagot mo anumang oras.</div>
+    <div id="noConsent" class="warnbox" hidden>We need your consent to register you and give you a sample. You may change your answer at any time.</div>
   </section>
 
   <div id="afterConsent" hidden>
     <section class="q" data-q="petType">
-      <div class="qTitle">Aso o pusa ang fur baby mo?</div>
+      <div class="qTitle">Do you have a dog or a cat?</div>
       <div class="choices three" data-name="petType">
         <button type="button" class="choice" data-v="DOG">🐶 Dog</button>
         <button type="button" class="choice" data-v="CAT">🐱 Cat</button>
@@ -48,25 +48,25 @@
     </section>
 
     <div id="dogPart" hidden>
-      <div class="partHead">🐶 Tungkol sa aso mo</div>
+      <div class="partHead">🐶 About your dog</div>
       <section class="q" data-q="dogNames">
-        <div class="qTitle">Pangalan ng aso mo</div>
-        <div class="qSub">Kung marami, ilagay lahat (hal. Choco, Bantay)</div>
+        <div class="qTitle">Dog's name</div>
+        <div class="qSub">If you have more than one, list all names (e.g. Choco, Max)</div>
         <input id="dogNames" class="big" maxlength="120" autocomplete="off" placeholder="Choco">
       </section>
       <section class="q" data-q="dogCount">
-        <div class="qTitle">Ilan ang aso mo?</div>
+        <div class="qTitle">How many dogs do you have?</div>
         <div class="stepper" data-name="dogCount"><button type="button" class="stepBtn" data-d="-1">−</button><span class="stepValue">1</span><button type="button" class="stepBtn" data-d="1">+</button></div>
       </section>
       <section class="q" data-q="dogAge">
-        <div class="qTitle">Edad</div>
+        <div class="qTitle">Age</div>
         <div class="choices two" data-name="dogAge">
           <button type="button" class="choice" data-v="PUPPY">Puppy (below 1 yr)</button>
           <button type="button" class="choice" data-v="ADULT">Adult (1 yr+)</button>
         </div>
       </section>
       <section class="q" data-q="dogSize">
-        <div class="qTitle">Laki ng aso</div>
+        <div class="qTitle">Size</div>
         <div class="choices three" data-name="dogSize">
           <button type="button" class="choice" data-v="SMALL">Small<small>Shih Tzu, Pom, Chihuahua</small></button>
           <button type="button" class="choice" data-v="MEDIUM">Medium<small>Beagle, Aspin</small></button>
@@ -74,51 +74,51 @@
         </div>
       </section>
       <section class="q" data-q="dogBrand">
-        <div class="qTitle">Anong dog food ang gamit mo ngayon?</div>
+        <div class="qTitle">Which dog food brand do you use now?</div>
         <div class="choices brands" data-name="dogBrand"></div>
-        <input id="dogBrandOther" class="big" maxlength="60" placeholder="Anong brand?" hidden>
+        <input id="dogBrandOther" class="big" maxlength="60" placeholder="Brand name" hidden>
       </section>
     </div>
 
     <div id="catPart" hidden>
-      <div class="partHead">🐱 Tungkol sa pusa mo</div>
+      <div class="partHead">🐱 About your cat</div>
       <section class="q" data-q="catNames">
-        <div class="qTitle">Pangalan ng pusa mo</div>
-        <div class="qSub">Kung marami, ilagay lahat (hal. Mingming, Tiger)</div>
+        <div class="qTitle">Cat's name</div>
+        <div class="qSub">If you have more than one, list all names (e.g. Mingming, Tiger)</div>
         <input id="catNames" class="big" maxlength="120" autocomplete="off" placeholder="Mingming">
       </section>
       <section class="q" data-q="catCount">
-        <div class="qTitle">Ilan ang pusa mo?</div>
+        <div class="qTitle">How many cats do you have?</div>
         <div class="stepper" data-name="catCount"><button type="button" class="stepBtn" data-d="-1">−</button><span class="stepValue">1</span><button type="button" class="stepBtn" data-d="1">+</button></div>
       </section>
       <section class="q" data-q="catAge">
-        <div class="qTitle">Edad</div>
+        <div class="qTitle">Age</div>
         <div class="choices two" data-name="catAge">
           <button type="button" class="choice" data-v="KITTEN">Kitten (below 1 yr)</button>
           <button type="button" class="choice" data-v="ADULT">Adult (1 yr+)</button>
         </div>
       </section>
       <section class="q" data-q="catBrand">
-        <div class="qTitle">Anong cat food ang gamit mo ngayon?</div>
+        <div class="qTitle">Which cat food brand do you use now?</div>
         <div class="choices brands" data-name="catBrand"></div>
-        <input id="catBrandOther" class="big" maxlength="60" placeholder="Anong brand?" hidden>
+        <input id="catBrandOther" class="big" maxlength="60" placeholder="Brand name" hidden>
       </section>
     </div>
 
     <div id="youPart" hidden>
-      <div class="partHead">Ikaw naman</div>
+      <div class="partHead">About you</div>
       <section class="q" data-q="name">
-        <div class="qTitle">Pangalan mo</div>
+        <div class="qTitle">Your name</div>
         <input id="name" class="big" maxlength="80" autocomplete="name" placeholder="Juan Dela Cruz">
       </section>
       <section class="q" data-q="mobile">
         <div class="qTitle">Mobile number</div>
-        <div class="qSub">Isang sample lang bawat mobile number</div>
+        <div class="qSub">One sample per mobile number</div>
         <input id="mobile" class="big" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="09171234567">
-        <div id="mobileHint" class="hint" hidden>Dapat 11 digits, nagsisimula sa 09.</div>
+        <div id="mobileHint" class="hint" hidden>Please enter 11 digits starting with 09.</div>
       </section>
       <section class="q" data-q="promo">
-        <div class="qTitle">Pwede ka ba naming i-text tungkol sa promos ng NutriChunks at Majesty?</div>
+        <div class="qTitle">May we send you text messages about NutriChunks and Majesty promotions?</div>
         <div class="choices two" data-name="promo">
           <button type="button" class="choice" data-v="YES">Yes</button>
           <button type="button" class="choice" data-v="NO">No</button>
@@ -126,21 +126,21 @@
       </section>
 
       <div id="formError" class="errbox" hidden></div>
-      <button id="submit" type="button" class="btn primary huge">Kunin ang FREE sample ko</button>
+      <button id="submit" type="button" class="btn primary huge">Get my FREE sample</button>
     </div>
   </div>
 </template>
 
 <template id="ticketTpl">
   <div class="ticket">
-    <div class="tkTop">Ipakita ito sa BA sa booth</div>
+    <div class="tkTop">Please show this ticket at the booth</div>
     <div class="tkCode" id="tkCode"></div>
     <div class="tkPets" id="tkPets"></div>
     <div class="tkQr" id="tkQr"></div>
     <div class="tkSamples" id="tkSamples"></div>
     <div class="tkMeta" id="tkMeta"></div>
   </div>
-  <div class="helper center">Tip: i-screenshot ang ticket na ito. Huwag isara ang page hangga't hindi mo pa nakukuha ang sample.</div>
+  <div class="helper center">Tip: take a screenshot of this ticket. Please keep this page open until you receive your sample.</div>
 </template>
 
 <script src="vendor/qrcode.js"></script>

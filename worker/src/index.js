@@ -113,9 +113,9 @@ export async function handleApi(request, env, deps = {}) {
     }
 
     if (path === "/api/register" && method === "POST") {
-      if (limited("reg|" + ip, 20, 10 * 60 * 1000)) return json({ ok: false, error: "SLOW_DOWN", message: "Masyadong maraming try. Maghintay ng ilang minuto." }, 429);
+      if (limited("reg|" + ip, 20, 10 * 60 * 1000)) return json({ ok: false, error: "SLOW_DOWN", message: "Too many attempts. Please wait a few minutes and try again." }, 429);
       const b = await body(request);
-      if (!b) return json({ ok: false, error: "BAD_REQUEST", message: "Invalid form." }, 400);
+      if (!b) return json({ ok: false, error: "BAD_REQUEST", message: "Invalid form. Please try again." }, 400);
       const payload = {
         condoId: String(b.condoId || "").slice(0, 20), regId: String(b.regId || "").slice(0, 64),
         consent: b.consent === "YES" ? "YES" : "NO", promoOptIn: b.promoOptIn === "YES" ? "YES" : "NO",

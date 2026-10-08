@@ -23,7 +23,7 @@
   async function api(path, opts) {
     var res = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, opts || {}));
     var data = {};
-    try { data = await res.json(); } catch (e) { data = { ok: false, message: "Walang sagot ang server." }; }
+    try { data = await res.json(); } catch (e) { data = { ok: false, message: "No response from the server. Please try again." }; }
     return data;
   }
 
@@ -41,20 +41,20 @@
     var ids = (t.samples || []).map(function (s) { return s.id; });
     $("tkQr").innerHTML = qrSvg("SMFC1|" + t.code + "|" + ids.join(","));
     var html = (t.samples || []).map(function (s) { return '<div class="sample">🎁 ' + esc(s.name) + "</div>"; }).join("");
-    if (t.noStock) html += '<div class="sample none">Pasensya na, ubos na ang ' + (ids.length ? "isang" : "") + " sample para sa ngayon. Salamat sa pag-register!</div>";
+    if (t.noStock) html += '<div class="sample none">' + (ids.length ? "One of the samples" : "The sample") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
     $("tkMeta").textContent = (t.condoName || "") + " • " + (t.registeredAt || t.date || "");
     var box = main.querySelector(".ticket");
     if (t.status === "CLAIMED") {
       box.classList.add("claimed");
-      box.querySelector(".tkTop").innerHTML = '<span class="stamp">✓ NA-CLAIM NA</span>';
+      box.querySelector(".tkTop").innerHTML = '<span class="stamp">✓ SAMPLE RECEIVED</span>';
     }
     var again = document.createElement("div");
     again.className = "center";
-    again.innerHTML = '<button type="button" class="linkBtn" id="another">Iba ang magre-register sa phone na ito? Tap dito</button>';
+    again.innerHTML = '<button type="button" class="linkBtn" id="another">Registering someone else on this phone? Tap here</button>';
     main.appendChild(again);
     $("another").onclick = function () {
-      if (!confirm("Itago ang ticket na ito at mag-register ng ibang tao? (Siguraduhing na-claim na ang sample.)")) return;
+      if (!confirm("Close this ticket and register another person? (Please make sure this sample has been received.)")) return;
       try { localStorage.removeItem(TICKET_KEY); } catch (e) { }
       location.reload();
     };
@@ -152,13 +152,13 @@
     if (miss.length) {
       miss.forEach(function (k) { var q = main.querySelector('.q[data-q="' + k + '"]'); if (q) q.classList.add("bad"); });
       var first = main.querySelector(".q.bad");
-      err.hidden = false; err.textContent = "May kulang pa. Sagutan ang mga naka-pula.";
+      err.hidden = false; err.textContent = "Some answers are missing. Please complete the items marked in red.";
       if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     err.hidden = true;
     var btn = $("submit");
-    btn.disabled = true; btn.textContent = "Sine-save…";
+    btn.disabled = true; btn.textContent = "Saving…";
     var dogBrand = isOther(state.dogBrand) ? "Other: " + $("dogBrandOther").value.trim() : state.dogBrand;
     var catBrand = isOther(state.catBrand) ? "Other: " + $("catBrandOther").value.trim() : state.catBrand;
     var regId = uuid();
@@ -170,7 +170,7 @@
     };
     var r;
     try { r = await api("/api/register", { method: "POST", body: JSON.stringify(payload) }); }
-    catch (e) { r = { ok: false, message: "Walang internet. Subukan ulit pag may signal (o lumapit sa booth)." }; }
+    catch (e) { r = { ok: false, message: "No internet connection. Please try again when you have signal, or ask our staff at the booth." }; }
     if (r.ok && r.ticket) {
       r.ticket.regId = regId;
       saveTicket(r.ticket);
@@ -178,20 +178,20 @@
       showTicket(r.ticket);
       return;
     }
-    btn.disabled = false; btn.textContent = "Kunin ang FREE sample ko";
-    err.hidden = false; err.textContent = r.message || "Hindi na-save. Subukan ulit.";
+    btn.disabled = false; btn.textContent = "Get my FREE sample";
+    err.hidden = false; err.textContent = r.message || "Your registration was not saved. Please try again.";
     if (r.error === "ALREADY_REGISTERED" || r.error === "BAD_MOBILE") main.querySelector('.q[data-q="mobile"]').classList.add("bad");
   }
 
   async function start() {
     var t = loadTicket();
     if (t && t.code) { $("condoLine").textContent = t.condoName || ""; return refreshTicket(t); }
-    if (!condoId) { main.innerHTML = '<div class="errbox">I-scan ang QR code sa booth para mag-register.</div>'; return; }
+    if (!condoId) { main.innerHTML = '<div class="errbox">Please scan the QR code at the booth to register.</div>'; return; }
     try { info = await api("/api/condo?c=" + encodeURIComponent(condoId)); }
-    catch (e) { info = { ok: false, message: "Walang internet. Subukan ulit pag may signal." }; }
-    if (!info.ok) { main.innerHTML = '<div class="errbox">' + esc(info.message || "May problema. Subukan ulit.") + "</div>"; return; }
+    catch (e) { info = { ok: false, message: "No internet connection. Please try again when you have signal." }; }
+    if (!info.ok) { main.innerHTML = '<div class="errbox">' + esc(info.message || "Something went wrong. Please try again.") + "</div>"; return; }
     $("condoLine").textContent = info.condo.name;
-    if (!info.running) { main.innerHTML = '<div class="warnbox">' + esc(info.condo.name) + ": wala pang sampling ngayong araw. Abangan kami!</div>"; return; }
+    if (!info.running) { main.innerHTML = '<div class="warnbox">' + esc(info.condo.name) + ": there is no sampling today. We hope to see you at our next visit!</div>"; return; }
     buildForm();
   }
 
