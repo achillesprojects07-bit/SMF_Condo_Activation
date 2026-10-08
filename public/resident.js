@@ -170,7 +170,7 @@
     };
     var r;
     try { r = await api("/api/register", { method: "POST", body: JSON.stringify(payload) }); }
-    catch (e) { r = { ok: false, message: "No internet connection. Please try again when you have signal, or ask our staff at the booth." }; }
+    catch (e) { r = { ok: false, message: "No internet connection. Please try again when you have signal, or ask our Pet Pals at the booth." }; }
     if (r.ok && r.ticket) {
       r.ticket.regId = regId;
       saveTicket(r.ticket);
