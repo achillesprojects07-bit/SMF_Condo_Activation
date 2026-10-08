@@ -1,5 +1,5 @@
 /* Look copied from the Barker's app: white until answered, green when answered, big tap buttons. */
-:root{--red:#e31920;--blue:#0066b3;--smfRed:#e31920;--smfBlue:#0066b3;--ncOrange:#f47b20;--mjPurple:#6a2c91;--ink:#1c2733;--muted:#66717d;--line:#e8edf2;--soft:#f7f9fb;--green:#12b76a;--greenDark:#067647;--greenSoft:#ecfdf3;--warn:#a66300}
+:root{--red:#e31920;--blue:#0066b3;--smfRed:#e31920;--freeGreen:#12a150;--smfBlue:#0066b3;--ncOrange:#f47b20;--mjPurple:#6a2c91;--ink:#1c2733;--muted:#66717d;--line:#e8edf2;--soft:#f7f9fb;--green:#12b76a;--greenDark:#067647;--greenSoft:#ecfdf3;--warn:#a66300}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:#f3f6f8;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:16px}
@@ -97,5 +97,5 @@ input.big + input.big, .choices + input.big{margin-top:10px}
 .linkBtn{background:none;border:0;color:var(--blue);font-weight:750;font-size:15px;padding:8px 0;font-family:inherit}
 label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 
-.free{color:var(--smfRed)}.nc{color:var(--ncOrange)}.mj{color:var(--mjPurple)}
+.free{color:var(--freeGreen)}.nc{color:var(--ncOrange)}.mj{color:var(--mjPurple)}
 .heroTitle .free,.brand h1 .free{font-weight:900}
