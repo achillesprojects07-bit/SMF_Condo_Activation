@@ -104,3 +104,9 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .petPhoto .qSub{margin:8px 0 14px;line-height:1.45}
 .petPhoto strong{display:block}
 .petPhoto .petPreview{max-height:320px;object-fit:contain}
+
+/* Distinct colors help residents identify their assigned sample variants. */
+.sample.variant-puppy{background:#fff3d6;border-color:#efa72c;color:#795006}
+.sample.variant-maintenance{background:#e2f7f3;border-color:#199e91;color:#096f64}
+.sample.variant-small{background:#ffedf0;border-color:#e26e89;color:#99344a}
+.sample.variant-majesty{background:#f5eefa;border-color:#6a2c91;color:#6a2c91}
