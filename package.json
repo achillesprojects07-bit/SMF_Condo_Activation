@@ -2,7 +2,7 @@
   "name": "smf-condo-activation",
   "private": true,
   "scripts": {
-    "test": "node --test tests/gateway.test.cjs tests/worker.test.mjs tests/ticket-photo.test.cjs",
+    "test": "node --test tests/gateway.test.cjs tests/worker.test.mjs tests/ticket-photo.test.cjs tests/report-ui.test.cjs",
     "dev": "node tests/dev-server.mjs"
   }
 }

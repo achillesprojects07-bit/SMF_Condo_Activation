@@ -3,35 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Condo Sampling Report</title>
+<title>Condo Sampling Dashboard</title>
 <link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="app.css">
 <style>
-.app.wide{max-width:1100px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.3px;background:var(--soft);position:sticky;top:0}
-td.n,th.n{text-align:right}
-.scroll{overflow:auto;max-height:520px;border:1.5px solid var(--line);border-radius:12px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
-.kpi{background:var(--soft);border-radius:14px;padding:12px}
-.kpi b{display:block;font-size:28px}
-.kpi span{font-size:13px;color:var(--muted)}
-.bar{height:10px;background:var(--green);border-radius:6px}
-.brandRow{display:grid;grid-template-columns:160px 1fr 40px;gap:10px;align-items:center;font-size:14px;padding:4px 0}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.toolbar .btn{width:auto;padding:10px 14px;font-size:15px}
-.toolbar select{font-size:15px;padding:10px;border-radius:12px;border:1.5px solid #c5cfd9;font-family:inherit}
-h2{font-size:18px;margin:22px 0 10px}
-.photo a{color:var(--blue)}
+:root{--report-navy:#17354a;--report-aqua:#168b91;--report-coral:#cf654d;--report-gold:#b88722}
+body{background:#f5f3ed;color:var(--report-navy)}
+.app.wide{max-width:1240px;background:#f5f3ed;box-shadow:none}
+.top{background:#fff;border-bottom:1px solid #e5e6e0;padding:18px 28px;position:static}
+.brand h1{font-size:18px}.pill{background:#edf5f4;color:#346368;font-weight:600}
+.content{padding:30px 28px 60px}.dashboard-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:26px}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:1.8px;color:#168b91}
+.dashboard-heading h1{font-size:32px;letter-spacing:-.8px;margin:8px 0}.dashboard-heading p{font-size:15px;color:#63727a;margin:0}
+.btn{cursor:pointer}.dashboard-heading .btn,.export-buttons .btn{width:auto;font-size:14px;padding:11px 16px;border-radius:10px;margin:0;border:1px solid #cdd7d8}
+button:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #168b91;outline-offset:3px}button:active{transform:translateY(1px)}
+.filterbar{display:flex;align-items:end;gap:18px;background:#fff;border:1px solid #e2e6e3;border-radius:14px;padding:17px 20px}
+.filterbar label{font-size:12px;color:#66757d;font-weight:700;display:grid;gap:7px}
+.filterbar select{font:inherit;font-size:14px;color:#17354a;border:1px solid #d3dcd9;border-radius:8px;background:#fff;padding:10px 35px 10px 12px;max-width:310px;min-height:42px}
+.scope-note{font-size:12px;color:#6f7d80;margin-left:auto;padding-bottom:12px}
+.report-tabs{display:flex;gap:8px;border-bottom:1px solid #dce1dc;margin:24px 0;padding-bottom:0;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:12px 16px;font:inherit;font-size:14px;font-weight:700;color:#6b777c;white-space:nowrap;cursor:pointer}
+.tab.active{color:#17354a;border-bottom-color:#168b91}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.metric{background:#fff;border:1px solid #e1e5e1;border-top:3px solid var(--report-navy);border-radius:13px;padding:21px 20px;min-height:148px}
+.metric span{font-size:13px;font-weight:700;display:block;color:#526873}.metric strong{font-size:38px;letter-spacing:-1px;display:block;margin:12px 0 6px;color:#17354a}.metric small{font-size:12px;color:#76848b;display:block;line-height:1.4}
+.metric.aqua{border-top-color:var(--report-aqua)}.metric.coral{border-top-color:var(--report-coral)}.metric.gold{border-top-color:var(--report-gold)}
+.definition{font-size:13px;color:#6c787d;margin:16px 0 24px;line-height:1.6}
+.panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:24px}.panel{background:#fff;border:1px solid #e1e5e1;border-radius:14px;padding:24px;margin-bottom:22px;min-width:0}.panel-grid .panel{margin-bottom:0}
+h2{font-size:19px;letter-spacing:-.2px;margin:0 0 8px}h3{font-size:16px;margin:0}.panel-note,.section-heading p{font-size:13px;color:#6c7b81;margin:0 0 22px;line-height:1.6}
+.chart-row{display:grid;grid-template-columns:minmax(130px,1fr) 1.3fr 44px;align-items:center;gap:14px;margin:20px 0;font-size:13px}.chart-label{line-height:1.4}.chart-row strong,.compare-row b{text-align:right;font-size:15px}
+.chart-track{background:#eef1ed;border-radius:4px;height:14px;overflow:hidden}.chart-fill{height:100%;border-radius:4px;background:var(--report-aqua)}.chart-fill.navy{background:var(--report-navy)}.chart-fill.coral{background:var(--report-coral)}
+.comparison{padding:14px 0;border-bottom:1px solid #edf0eb}.comparison:last-child{border:0}.comparison>strong{font-size:14px}.compare-row{display:grid;grid-template-columns:80px 1fr 36px;gap:12px;align-items:center;font-size:12px;color:#66757d;margin-top:12px}
+.empty{background:#edf2ee;border:1px dashed #cdd8d0;border-radius:12px;padding:24px;margin-bottom:22px}.empty strong{font-size:15px}.empty p{font-size:13px;color:#6b7b76;line-height:1.6;margin:7px 0 0}.panel .empty{background:#fafbf8;margin:0;min-height:100px}
+.section-heading{margin:28px 0 18px}.stock-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.stock-card{padding:22px}.stock-title{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:12px}.badge{border-radius:6px;background:#edf0ed;color:#59696b;font-size:11px;font-weight:700;padding:6px 9px;white-space:nowrap}.badge.scheduled{background:#fff4dc;color:#8a6720}.badge.received{background:#e7f4ed;color:#287a59}
+table{width:100%;border-collapse:collapse;font-size:12px}th{font-weight:700;color:#728187;background:#f7f8f5}th,td{padding:12px 8px;border-bottom:1px solid #edf0e9;text-align:right}th:first-child,td:first-child{text-align:left;width:45%;line-height:1.5}tbody tr:last-child td{border:0}.table-scroll{overflow-x:auto}
+.resident-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.notice{font-size:14px;color:#85622e;background:#fff4dc;border-radius:10px;padding:18px;margin-top:22px}
+.records-heading{display:flex;justify-content:space-between;align-items:center;gap:20px}.records-heading p{margin-bottom:0}.export-buttons{display:flex;gap:8px}.resident-record{background:#fff;border:1px solid #e1e5e1;border-radius:12px;margin-bottom:10px}.resident-record summary{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;gap:16px;cursor:pointer;list-style:none}.resident-record summary::after{content:'+';font-size:22px;color:#168b91}.resident-record[open] summary::after{content:'−'}.resident-record summary>span:first-child{flex:1}.resident-record summary strong{font-size:15px}.resident-record summary small{display:block;color:#738087;font-size:12px;margin-top:6px;line-height:1.5}
+.resident-record dl{border-top:1px solid #edf0e9;display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:0;padding:24px}.resident-record dt{font-size:11px;color:#738087;font-weight:700;margin-bottom:6px}.resident-record dd{font-size:14px;margin:0;overflow-wrap:anywhere}.resident-record a{color:#168b91}
+.login-card{max-width:420px;margin:45px auto;background:#fff;padding:30px;border:1px solid #e1e5e1;border-radius:16px}.login-card p{font-size:14px;color:#6b797d}.login-card .btn.primary{background:#17354a}
+@media(max-width:850px){.metrics{grid-template-columns:1fr 1fr}.stock-grid{grid-template-columns:1fr}.scope-note{display:none}.panel-grid{gap:16px}.chart-row{grid-template-columns:minmax(100px,1fr) 1fr 32px;gap:9px}.records-heading{align-items:start;flex-direction:column}.resident-metrics{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:600px){.top{padding:16px}.content{padding:22px 16px 40px}.brand h1{font-size:15px}.pill{font-size:10px;padding:6px}.dashboard-heading h1{font-size:27px}.dashboard-heading{align-items:start;gap:10px}.dashboard-heading .btn{font-size:12px;padding:10px}.dashboard-heading p{font-size:13px}.filterbar{padding:14px;gap:12px;align-items:stretch;flex-direction:column}.filterbar select{max-width:100%;width:100%}.metrics{gap:10px}.metric{padding:16px 13px;min-height:155px}.metric strong{font-size:32px}.metric span{font-size:12px}.panel-grid{grid-template-columns:1fr}.panel{padding:20px}.resident-metrics{grid-template-columns:1fr}.resident-metrics .metric{min-height:120px}.resident-record summary{flex-wrap:wrap;padding:16px}.resident-record summary>span:first-child{flex-basis:100%}.resident-record dl{grid-template-columns:1fr}.stock-card th,.stock-card td{font-size:11px;padding:10px 5px}.export-buttons{flex-wrap:wrap}.tab{padding:12px 11px;font-size:13px}}
 </style>
 </head>
 <body>
 <div class="app wide">
   <header class="top">
     <img class="brandmark" src="smf-logo.png" alt="San Miguel Foods">
-    <div class="brand"><h1>Condo Sampling Report</h1><p>NutriChunks • Majesty</p></div>
+    <div class="brand"><h1>Condo Sampling Dashboard</h1><p>NutriChunks • Majesty</p></div>
     <div class="pill" id="upd"></div>
   </header>
   <main id="main" class="content"></main>

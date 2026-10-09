@@ -1,95 +1,96 @@
-/* Client report: registrations per condo per day, dogs vs cats, current brands, samples given, stock left, and every detail collected. */
+/* Client dashboard. All views and exports use the same date and condo filters. */
 (function () {
-  "use strict";
-  var main = document.getElementById("main"), upd = document.getElementById("upd");
-  var KEY = "smfc_report_token_v1", token = null, data = null, filter = "ALL";
+  'use strict';
+  var main = document.getElementById('main'), upd = document.getElementById('upd');
+  var KEY = 'smfc_report_token_v1', token = null, data = null, filter = 'ALL', condoFilter = 'ALL', view = 'overview';
   function $(id) { return document.getElementById(id); }
-  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
-  function sum(arr, f) { return arr.reduce(function (a, x) { return a + (f(x) || 0); }, 0); }
-  try { token = sessionStorage.getItem(KEY); } catch (e) { }
-
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function num(n) { return (Number(n) || 0).toLocaleString('en-PH'); }
+  function sum(rows, fn) { return rows.reduce(function(a,r) { return a + (Number(fn(r)) || 0); },0); }
+  function dateLabel(d) { if (!d) return '—'; var v = new Date(d + 'T00:00:00+08:00'); return isNaN(v) ? esc(d) : v.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:'Asia/Manila'}); }
+  function empty(title, note) { return '<div class="empty"><strong>'+esc(title)+'</strong><p>'+esc(note)+'</p></div>'; }
+  function panel(title, note, content) { return '<section class="panel"><h2>'+esc(title)+'</h2><p class="panel-note">'+esc(note)+'</p>'+content+'</section>'; }
+  function bars(items, color) {
+    var max = Math.max.apply(null,items.map(function(x){return x.value;}).concat([1]));
+    return '<div class="chart" role="img" aria-label="'+esc(items.map(function(x){return x.label+': '+x.value;}).join('; '))+'">'+items.map(function(x){return '<div class="chart-row"><div class="chart-label">'+esc(x.label)+'</div><div class="chart-track"><div class="chart-fill '+(color || 'aqua')+'" style="width:'+(x.value/max*100)+'%"></div></div><strong>'+num(x.value)+'</strong></div>';}).join('')+'</div>';
+  }
+  function countBars(rows, field) {
+    var m = {}; rows.forEach(function(r){ var k=typeof field==='function'?field(r):r[field]; if(k) m[k]=(m[k]||0)+1; });
+    var list = Object.keys(m).map(function(k){return {label:k,value:m[k]};}).sort(function(a,b){return b.value-a.value;});
+    return list.length ? bars(list) : empty('No resident data yet','This graph will appear after residents register.');
+  }
+  function kpi(value,label,note,color) { return '<div class="metric '+color+'"><span>'+esc(label)+'</span><strong>'+num(value)+'</strong><small>'+esc(note)+'</small></div>'; }
+  function status(r) { return r.STATUS==='CLAIMED'?'Sample received':r.STATUS==='WAITING'?'Awaiting collection':r.STATUS==='NO_STOCK'?'No sample available':r.STATUS||'Unknown'; }
+  function match(date,condo) { return (filter==='ALL'||date===filter)&&(condoFilter==='ALL'||condo===condoFilter); }
+  function photo(url,label) { return /^https:\/\//i.test(url||'') ? '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(label)+'</a>' : '—'; }
+  try { token = sessionStorage.getItem(KEY); } catch(e) {}
   function login(msg) {
-    main.innerHTML = '<div style="max-width:420px;margin:30px auto"><div class="hero"><div class="heroTitle">Client sign in</div><div class="heroSub">Enter the report passcode.</div></div>' +
-      '<input id="pass" class="big" type="password" autocomplete="current-password" placeholder="Passcode"><div id="err" class="errbox" hidden></div>' +
-      '<button id="go" class="btn primary huge" type="button">View report</button></div>';
-    if (msg) { $("err").hidden = false; $("err").textContent = msg; }
-    $("go").onclick = async function () {
-      var r = await fetch("/api/report/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ passcode: $("pass").value }) }).then(function (x) { return x.json(); }).catch(function () { return { ok: false, message: "No connection." }; });
-      if (!r.ok) { $("err").hidden = false; $("err").textContent = r.message || "Wrong passcode."; return; }
-      token = r.token; try { sessionStorage.setItem(KEY, token); } catch (e) { }
-      load();
+    main.innerHTML='<div class="login-card"><h2>Client sign in</h2><p>Enter your client access code.</p><label class="lbl" for="pass">Client code</label><input id="pass" class="big" type="password" autocomplete="current-password" placeholder="Client code"><div id="err" class="errbox" hidden></div><button id="go" class="btn primary huge" type="button">View dashboard</button></div>';
+    if(msg){$('err').hidden=false;$('err').textContent=msg;}
+    $('go').onclick=async function(){
+      $('go').disabled=true;$('go').textContent='Signing in…';
+      var r=await fetch('/api/report/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:$('pass').value})}).then(function(x){return x.json();}).catch(function(){return {ok:false,message:'No connection. Please try again.'};});
+      if(!r.ok){$('go').disabled=false;$('go').textContent='View dashboard';$('err').hidden=false;$('err').textContent=r.message||'Incorrect client code.';return;}
+      token=r.token;try{sessionStorage.setItem(KEY,token);}catch(e){} load();
     };
+    $('pass').onkeydown=function(e){if(e.key==='Enter'&&!$('go').disabled)$('go').click();};
   }
-
   async function load() {
-    main.innerHTML = '<div class="statusbox">Loading report…</div>';
-    var r = await fetch("/api/report", { headers: { Authorization: "Bearer " + token } }).then(function (x) { return x.json(); }).catch(function () { return { ok: false, message: "No connection." }; });
-    if (!r.ok) { if (r.error === "SIGN_IN" || r.error === "FORBIDDEN") return login("Please sign in."); main.innerHTML = '<div class="errbox">' + esc(r.message || "Could not load.") + "</div>"; return; }
-    data = r; upd.textContent = "Updated " + new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
-    render();
+    main.innerHTML='<div class="statusbox">Loading dashboard…</div>';
+    var r=await fetch('/api/report',{headers:{Authorization:'Bearer '+token}}).then(function(x){return x.json();}).catch(function(){return {ok:false,message:'No connection. Please try again.'};});
+    if(!r.ok){if(r.error==='SIGN_IN'||r.error==='FORBIDDEN')return login('Please sign in again.');main.innerHTML='<div class="errbox">'+esc(r.message||'Could not load the dashboard.')+'</div><button class="btn secondary" id="retry">Try again</button>';$('retry').onclick=load;return;}
+    data=r;upd.textContent='Updated '+new Date().toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Manila'});render();
   }
-
   function render() {
-    var days = data.days.filter(function (d) { return filter === "ALL" || d.date === filter; });
-    var regs = data.registrations.filter(function (r) { return filter === "ALL" || r.DATE === filter; });
-    var pids = Object.keys(data.products);
-    var dates = Array.from(new Set(data.days.map(function (d) { return d.date; }))).sort();
-    var given = sum(days, function (d) { return sum(pids, function (p) { return d.given[p]; }); });
-    var alloc = sum(days, function (d) { return sum(pids, function (p) { return d.allocated[p]; }); });
-
-    var h = '<div class="toolbar"><select id="day"><option value="ALL">All days</option>' + dates.map(function (d) { return '<option' + (d === filter ? " selected" : "") + ">" + d + "</option>"; }).join("") + "</select>" +
-      '<button class="btn secondary" id="refresh" type="button">Refresh</button><button class="btn dark" id="csvReg" type="button">Download all registrations (CSV)</button><button class="btn secondary" id="csvRed" type="button">Download claims log (CSV)</button></div>';
-
-    h += '<div class="kpis">' +
-      kpi(sum(days, function (d) { return d.registered; }), "Registrations") +
-      kpi(sum(days, function (d) { return d.dogs; }), "Dogs") +
-      kpi(sum(days, function (d) { return d.cats; }), "Cats") +
-      kpi(sum(days, function (d) { return d.claimed; }), "Residents who claimed") +
-      kpi(given, "Sample packs given") +
-      kpi(alloc - given, "Packs left (of " + alloc + ")") +
-      kpi(sum(days, function (d) { return d.promoOptIn; }), "OK to receive promos") + "</div>";
-
-    h += "<h2>Per condo per day</h2><div class=\"scroll\"><table><tr><th>Date</th><th>Condo</th><th class=n>Registered</th><th class=n>Dog homes</th><th class=n>Cat homes</th><th class=n>Dog &amp; cat</th><th class=n>Dogs</th><th class=n>Cats</th><th class=n>Claimed</th><th class=n>Not yet claimed</th></tr>" +
-      days.map(function (d) { return "<tr><td>" + d.date + "</td><td>" + esc(d.condoName) + '</td><td class=n>' + d.registered + "</td><td class=n>" + d.dogHomes + "</td><td class=n>" + d.catHomes + "</td><td class=n>" + d.bothHomes + "</td><td class=n>" + d.dogs + "</td><td class=n>" + d.cats + "</td><td class=n>" + d.claimed + "</td><td class=n>" + d.waiting + "</td></tr>"; }).join("") + "</table></div>";
-
-    h += "<h2>Samples given and stock left</h2><div class=\"scroll\"><table><tr><th>Date</th><th>Condo</th>" + pids.map(function (p) { return "<th class=n>" + esc(data.products[p]) + "<br>given / left</th>"; }).join("") + "</tr>" +
-      days.map(function (d) { return "<tr><td>" + d.date + "</td><td>" + esc(d.condoName) + "</td>" + pids.map(function (p) { return "<td class=n>" + (d.given[p] || 0) + " / <b>" + (d.left[p] || 0) + "</b></td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
-
-    h += '<div class="cols"><div><h2>Current dog food brands</h2>' + brandBars(regs, "DOG_BRAND") + '</div><div><h2>Current cat food brands</h2>' + brandBars(regs, "CAT_BRAND") + "</div></div>";
-    h += '<div class="cols"><div><h2>Dog age and size</h2>' + countBars(regs, function (r) { return r.DOG_AGE ? r.DOG_AGE + " • " + (r.DOG_SIZE || "-") : ""; }) + '</div><div><h2>Cat age</h2>' + countBars(regs, function (r) { return r.CAT_AGE; }) + "</div></div>";
-
-    if (data.flags.length) h += "<h2>Claims to check (" + data.flags.length + ")</h2><div class=\"scroll\"><table><tr><th>Ticket</th><th>Result</th><th>BA</th><th>Note</th><th>Photo</th></tr>" + data.flags.map(function (f) { return "<tr><td>" + esc(f.CLAIM_CODE) + "</td><td>" + esc(f.RESULT) + "</td><td>" + esc(f.BA_NAME) + "</td><td>" + esc(f.NOTE) + '</td><td class="photo">' + (f.PHOTO_URL ? '<a href="' + esc(f.PHOTO_URL) + '" target="_blank" rel="noopener">View</a>' : "") + "</td></tr>"; }).join("") + "</table></div>";
-
-    var cols = ["CLAIM_CODE", "REGISTERED_AT", "CONDO_NAME", "RESIDENT_NAME", "MOBILE", "PET_TYPE", "DOG_COUNT", "DOG_NAMES", "DOG_AGE", "DOG_SIZE", "DOG_BRAND", "CAT_COUNT", "CAT_NAMES", "CAT_AGE", "CAT_BRAND", "PROMO_OPT_IN", "STATUS", "SAMPLES_GIVEN", "CLAIMED_AT", "CLAIMED_BY", "PHOTO_URL", "PHOTO_CONSENT", "CUSTOMER_PHOTO_URL"];
-    h += "<h2>All registrations (" + regs.length + ")</h2><div class=\"scroll\"><table><tr>" + cols.map(function (c) { return "<th>" + c.replace(/_/g, " ").toLowerCase() + "</th>"; }).join("") + "</tr>" +
-      regs.map(function (r) { return "<tr>" + cols.map(function (c) { return (c === "PHOTO_URL" || c === "CUSTOMER_PHOTO_URL") ? '<td class="photo">' + (r[c] ? '<a href="' + esc(r[c]) + '" target="_blank" rel="noopener">View</a>' : "") + "</td>" : "<td>" + esc(r[c]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
-
-    main.innerHTML = h;
-    $("day").onchange = function () { filter = this.value; render(); };
-    $("refresh").onclick = load;
-    $("csvReg").onclick = function () { csv("condo-registrations.csv", regs); };
-    $("csvRed").onclick = function () { csv("condo-claims-log.csv", data.redemptions.filter(function (r) { return filter === "ALL" || r.DATE === filter; })); };
+    var days=(data.days||[]).filter(function(d){return match(d.date,d.condoId);});
+    var regs=(data.registrations||[]).filter(function(r){return match(r.DATE,r.CONDO_ID);});
+    var reds=(data.redemptions||[]).filter(function(r){return match(r.DATE,r.CONDO_ID);});
+    var flags=(data.flags||[]).filter(function(r){return match(r.DATE,r.CONDO_ID);});
+    var pids=Object.keys(data.products||{}), dates=Array.from(new Set((data.days||[]).map(function(d){return d.date;}))).sort();
+    var condos={};(data.days||[]).forEach(function(d){condos[d.condoId]=d.condoName;});
+    var claimed=regs.filter(function(r){return r.STATUS==='CLAIMED';}), waiting=regs.filter(function(r){return r.STATUS==='WAITING';}).length;
+    var given=sum(days,function(d){return sum(pids,function(p){return d.given[p];});});
+    var h='<div class="dashboard-heading"><div><div class="eyebrow">CONDOMINIUM SAMPLING</div><h1>Program performance</h1><p>Resident registrations and free sample distribution.</p></div><button class="btn secondary" id="refresh" type="button">Refresh data</button></div>';
+    h+='<div class="filterbar"><label for="day">Date<select id="day"><option value="ALL">All dates</option>'+dates.map(function(d){return '<option value="'+esc(d)+'"'+(d===filter?' selected':'')+'>'+dateLabel(d)+'</option>';}).join('')+'</select></label><label for="condo">Condominium<select id="condo"><option value="ALL">All condominiums</option>'+Object.keys(condos).map(function(c){return '<option value="'+esc(c)+'"'+(c===condoFilter?' selected':'')+'>'+esc(condos[c])+'</option>';}).join('')+'</select></label><span class="scope-note">Live program records only · Training excluded</span></div>';
+    h+='<nav class="report-tabs" aria-label="Dashboard sections">'+[['overview','Overview'],['samples','Samples & stock'],['residents','Resident profiles'],['records','Records & photos']].map(function(t){return '<button type="button" data-view="'+t[0]+'" aria-current="'+(view===t[0]?'page':'false')+'" class="tab '+(view===t[0]?'active':'')+'">'+t[1]+'</button>';}).join('')+'</nav>';
+    if(view==='overview') {
+      h+='<div class="metrics">'+kpi(regs.length,'Households registered','One registration per mobile number','navy')+kpi(claimed.length,'Households served','Already received their free sample','aqua')+kpi(given,'Sample packs distributed','Counts packs, not households','coral')+kpi(waiting,'Awaiting collection','Registered with a sample available','gold')+'</div>';
+      h+='<p class="definition">A household with both a dog and a cat may receive two packs. This is why packs distributed can exceed households served.</p>';
+      if(!regs.length)h+=empty('No live resident registrations yet','Totals are zero because no live registrations match these filters. Scheduled sample allocations are shown in Samples & stock.');
+      var byCondo={};days.forEach(function(d){if(!byCondo[d.condoId])byCondo[d.condoId]={name:d.condoName,registered:0,claimed:0};});
+      regs.forEach(function(r){var x=byCondo[r.CONDO_ID]||(byCondo[r.CONDO_ID]={name:r.CONDO_NAME,registered:0,claimed:0});x.registered++;if(r.STATUS==='CLAIMED')x.claimed++;});
+      var max=Math.max.apply(null,Object.keys(byCondo).map(function(c){return byCondo[c].registered;}).concat([1]));
+      var condoChart=Object.keys(byCondo).map(function(c){var x=byCondo[c];return '<div class="comparison"><strong>'+esc(x.name)+'</strong><div class="compare-row"><span>Registered</span><div class="chart-track"><div class="chart-fill navy" style="width:'+x.registered/max*100+'%"></div></div><b>'+num(x.registered)+'</b></div><div class="compare-row"><span>Served</span><div class="chart-track"><div class="chart-fill aqua" style="width:'+x.claimed/max*100+'%"></div></div><b>'+num(x.claimed)+'</b></div></div>';}).join('');
+      h+='<div class="panel-grid">'+panel('Registrations and collection by condo','Households registered compared with households already served.',condoChart||empty('No condos in this view','Choose another date or condominium.'))+panel('Sample packs distributed','Actual packs released, by product. All samples are 150 g.',bars(pids.map(function(p){return {label:data.products[p],value:sum(days,function(d){return d.given[p];})};}),'coral'))+'</div>';
+      var noStock=regs.filter(function(r){return r.STATUS==='NO_STOCK';}).length;
+      if(noStock)h+='<div class="notice">'+num(noStock)+' registered household'+(noStock===1?'':'s')+' had no sample available. These are separate from households awaiting collection.</div>';
+    }
+    if(view==='samples') {
+      h+=panel('Sample distribution by product','Packs distributed under the selected date and condo filters. Each pack is 150 g.',bars(pids.map(function(p){return {label:data.products[p],value:sum(days,function(d){return d.given[p];})};}),'coral'));
+      h+='<div class="section-heading"><h2>Stock by condo and event date</h2><p>Allocated = planned supply. Remaining = allocated minus distributed, including packs reserved for unclaimed tickets.</p></div><div class="stock-grid">';
+      days.forEach(function(d){var future=d.date>data.today;h+='<section class="panel stock-card"><div class="stock-title"><h3>'+esc(d.condoName)+'</h3><span class="badge '+(future?'scheduled':'')+'">'+(future?'Scheduled':'Event date')+'</span></div><p class="panel-note">'+dateLabel(d.date)+(future?' · This event has not started yet.':'')+'</p><table><thead><tr><th>Product</th><th>Allocated</th><th>Distributed</th><th>Remaining</th></tr></thead><tbody>'+pids.map(function(p){var a=Number(d.allocated[p])||0,g=Number(d.given[p])||0;return '<tr><td>'+esc(data.products[p])+'</td><td>'+num(a)+'</td><td>'+num(g)+'</td><td>'+num(a-g)+'</td></tr>';}).join('')+'</tbody></table></section>';});
+      h+='</div>';if(!days.length)h+=empty('No stock allocations in this view','Choose another date or condominium.');
+    }
+    if(view==='residents') {
+      h+='<div class="metrics resident-metrics">'+kpi(sum(regs,function(r){return r.DOG_COUNT;}),'Dogs recorded','Number of pets, not households','navy')+kpi(sum(regs,function(r){return r.CAT_COUNT;}),'Cats recorded','Number of pets, not households','aqua')+kpi(regs.filter(function(r){return r.PROMO_OPT_IN==='YES';}).length,'Agreed to receive promotions','Households with promotional consent','coral')+'</div>';
+      h+='<div class="panel-grid">'+panel('Current dog food brands','Number of registered households using each brand.',countBars(regs,'DOG_BRAND'))+panel('Current cat food brands','Number of registered households using each brand.',countBars(regs,'CAT_BRAND'))+panel('Pets in each household','Each household appears once. Dog & cat households form a separate group.',countBars(regs,function(r){return {DOG:'Dogs only',CAT:'Cats only',BOTH:'Dogs and cats'}[r.PET_TYPE]||'';}))+panel('Dog age and size','Households grouped by the dog profile entered at registration.',countBars(regs,function(r){return r.DOG_AGE ? r.DOG_AGE.replace(/_/g,' ')+' · '+(r.DOG_SIZE||'Size not recorded').replace(/_/g,' ') : '';}))+panel('Cat age','Households grouped by the cat age entered at registration.',countBars(regs,'CAT_AGE'))+'</div>';
+    }
+    if(view==='records') {
+      h+='<div class="section-heading records-heading"><div><h2>Resident records ('+num(regs.length)+')</h2><p>Open a resident to see their pet details, consent and photos.</p></div><div class="export-buttons"><button class="btn secondary" id="csvReg">Export registrations</button><button class="btn secondary" id="csvRed">Export claims log</button></div></div>';
+      h+=regs.length?'<div class="record-list">'+regs.map(function(r){return '<details class="resident-record"><summary><span><strong>'+esc(r.RESIDENT_NAME||'Name not recorded')+'</strong><small>'+esc(r.CLAIM_CODE)+' · '+esc(r.CONDO_NAME)+' · '+dateLabel(r.DATE)+'</small></span><span class="badge '+(r.STATUS==='CLAIMED'?'received':'')+'">'+esc(status(r))+'</span></summary><dl>'+[['Mobile',r.MOBILE],['Pets',r.PET_TYPE],['Dogs',r.DOG_COUNT],['Dog names',r.DOG_NAMES],['Dog age / size',[r.DOG_AGE,r.DOG_SIZE].filter(Boolean).join(' / ')],['Current dog food',r.DOG_BRAND],['Cats',r.CAT_COUNT],['Cat names',r.CAT_NAMES],['Cat age',r.CAT_AGE],['Current cat food',r.CAT_BRAND],['Sample packs given',String(r.SAMPLES_GIVEN||'').split(',').map(function(p){return data.products[p.trim()]||p.trim();}).join(', ')],['Claimed by',r.CLAIMED_BY],['Claimed at',r.CLAIMED_AT],['Promotional consent',r.PROMO_OPT_IN],['Customer photo consent',r.PHOTO_CONSENT==='YES'?'Agreed':r.PHOTO_CONSENT==='NO'?'Declined':'Not recorded']].map(function(x){return '<div><dt>'+x[0]+'</dt><dd>'+esc(x[1]||'—')+'</dd></div>';}).join('')+'<div><dt>Ticket photo</dt><dd>'+photo(r.PHOTO_URL,'View ticket photo')+'</dd></div><div><dt>Customer & sample photo</dt><dd>'+photo(r.CUSTOMER_PHOTO_URL,'View customer photo')+'</dd></div></dl></details>';}).join('')+'</div>':empty('No resident records yet','Live registrations will appear here. Training records are excluded.');
+      if(flags.length)h+=panel('Claim attempts to review ('+num(flags.length)+')','These are unsuccessful attempts, not additional sample distributions. Duplicate means the ticket was already claimed.','<div class="table-scroll"><table><thead><tr><th>Ticket</th><th>BA</th><th>What happened</th></tr></thead><tbody>'+flags.map(function(f){return '<tr><td>'+esc(f.CLAIM_CODE)+'</td><td>'+esc(f.BA_NAME)+'</td><td>'+esc(f.NOTE||f.RESULT)+'</td></tr>';}).join('')+'</tbody></table></div>');
+    }
+    main.innerHTML=h;
+    $('day').onchange=function(){filter=this.value;render();};$('condo').onchange=function(){condoFilter=this.value;render();};$('refresh').onclick=load;
+    main.querySelectorAll('[data-view]').forEach(function(b){b.onclick=function(){view=b.getAttribute('data-view');render();};});
+    if($('csvReg'))$('csvReg').onclick=function(){csv('condo-registrations.csv',regs);};
+    if($('csvRed'))$('csvRed').onclick=function(){csv('condo-claims-log.csv',reds);};
   }
-
-  function kpi(n, label) { return '<div class="kpi"><b>' + n + "</b><span>" + esc(label) + "</span></div>"; }
-  function countBars(rows, keyFn) {
-    var m = {}; rows.forEach(function (r) { var k = keyFn(r); if (k) m[k] = (m[k] || 0) + 1; });
-    var list = Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
-    if (!list.length) return '<div class="helper">No data yet.</div>';
-    var max = list[0][1];
-    return list.map(function (x) { return '<div class="brandRow"><span>' + esc(x[0]) + '</span><div class="bar" style="width:' + Math.max(4, Math.round(x[1] / max * 100)) + '%"></div><b>' + x[1] + "</b></div>"; }).join("");
+  function csv(name,rows){
+    if(!rows.length){alert('No records match these filters.');return;}
+    var cols=Object.keys(rows[0]),q=function(v){v=String(v==null?'':v);if(/^[=+\-@]/.test(v))v="'"+v;return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+    var text='\uFEFF'+[cols.join(',')].concat(rows.map(function(r){return cols.map(function(c){return q(r[c]);}).join(',');})).join('\n');
+    var a=document.createElement('a'),url=URL.createObjectURL(new Blob([text],{type:'text/csv'}));a.href=url;a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(url);},2000);
   }
-  function brandBars(rows, field) { return countBars(rows, function (r) { return r[field]; }); }
-
-  function csv(name, rows) {
-    if (!rows.length) { alert("No rows yet."); return; }
-    var cols = Object.keys(rows[0]);
-    var q = function (v) { v = String(v == null ? "" : v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    var text = "﻿" + [cols.join(",")].concat(rows.map(function (r) { return cols.map(function (c) { return q(r[c]); }).join(","); })).join("\n");
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" })); a.download = name; a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-  }
-
-  if (token) load(); else login();
+  if(token)load();else login();
 })();
