@@ -157,7 +157,8 @@ test("this app never points at the Barker's sheet", () => {
 });
 
 test("training day (practice mode, no stock rows today) still gives samples; clearTrainingData resets", () => {
-  const g = loadGateway({ now: new Date("2026-10-09T01:00:00Z") }); // Friday, YES by default
+  const g = loadGateway({ now: new Date("2026-10-09T01:00:00Z") });
+  g.setSetting('TEST_MODE', 'YES'); // legacy compatibility only; live defaults to NO
   const r = g.call("register", dogReg());
   assert.equal(r.ok, true); assert.deepEqual(r.ticket.samples.map(s => s.id), ["NC_SMALL_BREED"]);
   assert.equal(g.call("status", { condoId: "RR" }).stock.find(s => s.id === "NC_SMALL_BREED").left, 115);
@@ -203,4 +204,50 @@ test("separate photos and consent survive an existing-sheet upgrade and a retry"
   assert.equal(reg.RESIDENT_NAME, "Ana Cruz");
   assert.equal(g.call("redeem", payload).already, true);
   assert.equal(g.files.length, 2); assert.equal(g.table("REDEMPTIONS").length, 1);
+});
+
+function addTraining(g) {
+  g.sheets.get('CONDOS').appendRow(['TRAIN', 'BA Training', '', 'Training', 'TRAIN', 'ACTIVE']);
+  g.sheets.get('STAFF').appendRow(['DEMO-001', 'Demo BA 01', '1001', 'ACTIVE']);
+  g.sheets.get('SCHEDULE').appendRow(['2026-10-09', 'TRAIN', 'DEMO-001', '', '']);
+}
+
+test('training uses live saves with global practice OFF and stays out of reports before and after claim', () => {
+  const g = fresh(); addTraining(g);
+  assert.equal(g.call('staff_login', {staffCode:'DEMO-001', pin:'1001'}).testMode, false);
+  const t = g.call('register', dogReg({condoId:'TRAIN'}));
+  assert.equal(t.ok, true);
+  assert.equal(g.table('REGISTRATIONS')[0].DATA_TYPE, 'TRAINING');
+  assert.equal(g.call('report', {}).registrations.length, 0);
+  // Practice cannot use up the real resident's eligibility.
+  const real = g.call('register', dogReg()); assert.equal(real.ok, true);
+  const before = g.call('status', {condoId:'RR'}).stock;
+  assert.equal(g.call('redeem', {redemptionId:'training-1', code:t.ticket.code, condoId:'TRAIN',staffCode:'DEMO-001',staffName:'Demo BA 01',products:['NC_SMALL_BREED'],photoConsent:'NO'}).ok,true);
+  assert.deepEqual(g.call('status', {condoId:'RR'}).stock, before);
+  const report = g.call('report', {});
+  assert.equal(report.registrations.length,1); assert.equal(report.registrations[0].CLAIM_CODE,real.ticket.code);
+  assert.equal(report.redemptions.length,0);
+  assert.ok(report.condos.every(c=>c.CONDO_ID!=='TRAIN'));
+  assert.ok(report.schedule.every(s=>s.STAFF_CODE!=='DEMO-001'));
+  g.setNow('2026-10-12T02:00:00Z');
+  assert.equal(g.call('staff_login', {staffCode:'DEMO-001',pin:'1001'}).ok,true);
+  assert.equal(g.call('register', dogReg({condoId:'TRAIN',mobile:'09170000199'})).ok,true);
+  assert.equal(g.call('register', dogReg({mobile:'09170000299'})).error,'NOT_TODAY');
+});
+
+test('demo account cannot claim a live resident ticket', () => {
+  const g = fresh(); addTraining(g);
+  const t = g.call('register',dogReg());
+  assert.equal(g.call('redeem',{redemptionId:'wrong',code:t.ticket.code,staffCode:'DEMO-001',condoId:'RR',products:['NC_SMALL_BREED']}).error,'WRONG_ASSIGNMENT');
+  assert.equal(g.table('REGISTRATIONS')[0].STATUS,'WAITING');
+  assert.equal(g.table('REDEMPTIONS').length,0);
+});
+
+test('old demo claims are excluded while failed demo attempts cannot hide a real registration', () => {
+  const g = fresh();
+  const t = g.call('register',dogReg());
+  g.ctx.append_('REDEMPTIONS',{CLAIM_CODE:t.ticket.code, STAFF_CODE:'DEMO-002', RESULT:'UNKNOWN_CODE'});
+  assert.equal(g.call('report',{}).registrations.length,1);
+  g.ctx.append_('REDEMPTIONS',{CLAIM_CODE:t.ticket.code, STAFF_CODE:'DEMO-001', RESULT:'OK'});
+  assert.equal(g.call('report',{}).registrations.length,0);
 });
