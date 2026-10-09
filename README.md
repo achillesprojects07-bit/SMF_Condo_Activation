@@ -1,6 +1,6 @@
 # SMF Condo Activation (NutriChunks / Majesty condo sampling)
 
-Separate from the Barker's app. Own Google Sheet, own Cloudflare Worker. Nothing here touches the Barker's sheet or Worker.
+Separate from the Barker's app. Own Google Sheet, own  Cloudflare Worker. Nothing here touches the Barker's sheet or Worker.
 
 ## How it works
 1. Resident scans the QR poster at the booth -> opens `/?c=RR` (RR = condo code) on their own phone.
