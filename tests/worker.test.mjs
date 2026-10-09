@@ -10,7 +10,7 @@ test.after(() => server.close());
 
 test("public condo + register + own ticket", async () => {
   assert.equal((await j("/api/condo?c=RR")).body.condo.name, "Rainbow Ridge Condominium");
-  const reg = await j("/api/register", { method: "POST", body: JSON.stringify({ condoId: "RR", regId: "abc-1", consent: "YES", promoOptIn: "NO", name: "Ben", mobile: "09170001111", petType: "CAT", cat: { names: "Muning", count: 1, age: "ADULT", brand: "Whiskas" } }) });
+  const reg = await j("/api/register", { method: "POST", body: JSON.stringify({ condoId: "RR", regId: "abc-1", consent: "YES", promoOptIn: "NO", name: "Ben", mobile: "09170001111", petType: "CAT", cat: {profiles:[{name:"Muning",age:"ADULT",brand:"Whiskas",reason:"Pet likes it",photo:"data:image/jpeg;base64,/9j/AA=="}]} }) });
   assert.equal(reg.body.ok, true); assert.equal(reg.body.ticket.samples[0].id, "MJ_ADULT_SALMON");
   assert.equal((await j("/api/my-ticket?code=" + reg.body.ticket.code + "&reg=abc-1")).body.ok, true);
   assert.equal((await j("/api/my-ticket?code=" + reg.body.ticket.code + "&reg=wrong")).body.ok, false);
@@ -69,10 +69,10 @@ test("only GATEWAY_URL + GATEWAY_SECRET set: sign-in works and the report passco
 test('individual pet profiles survive the HTTP gateway and report counts each brand per household',async()=>{
  const {server:s3,gw:g3}=await startDevServer(8787,{testMode:false});
  try {
-  const profiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',reason:'Pet likes it'}];
+  const profiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Pet likes it'}];
   const r=await fetch('http://localhost:8787/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({condoId:'RR',consent:'YES',mobile:'09171111987',name:'Training Test',petType:'DOG',dog:{profiles,sampleIndex:1}})}).then(r=>r.json());
   assert.equal(r.ok,true);assert.deepEqual(r.ticket.samples.map(s=>s.id),['NC_PUPPY_LAMB','NC_MAINT_ADULT']);
-  assert.deepEqual(JSON.parse(g3.table('REGISTRATIONS')[0].DOG_PROFILES),profiles);
+  assert.deepEqual(JSON.parse(g3.table('REGISTRATIONS')[0].DOG_PROFILES).map(({photoUrl,photoFileId,...pet})=>pet),profiles.map(({photo,...pet})=>pet));
   const {buildReport}=await import('../worker/src/index.js');const report=buildReport(g3.call('report',{}));
   assert.equal(report.brands.DOG.Pedigree,1);assert.equal(report.brands.DOG.Vitality,1);assert.equal(report.days.find(d=>d.condoId==='RR').dogs,2);
  } finally {s3.close();}
@@ -82,7 +82,7 @@ test('BA OOS flag and unavailable variants survive HTTP; reporting still counts 
  const {server:s4,gw:g4}=await startDevServer(8786,{testMode:false});
  try {
   const req=async(path,options={})=>fetch('http://localhost:8786'+path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}}).then(r=>r.json());
-  const t=(await req('/api/register',{method:'POST',body:JSON.stringify({condoId:'RR',consent:'YES',mobile:'09179999876',petType:'DOG',dog:{age:'ADULT',size:'SMALL'}})})).ticket;
+  const t=(await req('/api/register',{method:'POST',body:JSON.stringify({condoId:'RR',consent:'YES',mobile:'09179999876',petType:'DOG',dog:{profiles:[{name:'Dog',age:'ADULT',size:'SMALL',brand:'Pedigree',reason:'Pet likes it',photo:'data:image/jpeg;base64,/9j/AA=='}]}})})).ticket;
   const login=await req('/api/staff/login',{method:'POST',body:JSON.stringify({staffCode:'PM01',pin:g4.pinOf('PM01')})});
   const r=await req('/api/redeem',{method:'POST',headers:{Authorization:'Bearer '+login.token},body:JSON.stringify({redemptionId:'http-oos',code:t.code,outOfStock:true,oosProducts:['NC_SMALL_BREED']})});
   assert.equal(r.ok,true);assert.equal(r.result,'OOS');

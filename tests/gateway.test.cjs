@@ -254,12 +254,12 @@ test('old demo claims are excluded while failed demo attempts cannot hide a real
 
 test('mixed puppy/adult and kitten/adult profiles keep separate brands and reasons', () => {
   const g=fresh();
-  const dogProfiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',reason:'Pet likes it'}];
-  const catProfiles=[{name:'Kit',age:'KITTEN',brand:'Whiskas',reason:'Easy to find'},{name:'Ming',age:'ADULT',brand:'Cuties',reason:'Recommended by vet'}];
+  const dogProfiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Pet likes it'}];
+  const catProfiles=[{name:'Kit',age:'KITTEN',brand:'Whiskas',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Easy to find'},{name:'Ming',age:'ADULT',brand:'Cuties',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Recommended by vet'}];
   const r=g.call('register',dogReg({petType:'BOTH',dog:{count:99,profiles:dogProfiles,sampleIndex:1},cat:{profiles:catProfiles}}));
   assert.equal(r.ok,true);assert.deepEqual(r.ticket.samples.map(s=>s.id),['NC_PUPPY_LAMB','NC_MAINT_ADULT','MJ_ADULT_SALMON']);
   const row=g.table('REGISTRATIONS')[0];assert.equal(row.DOG_COUNT,2);assert.equal(row.CAT_COUNT,2);
-  assert.deepEqual(JSON.parse(row.DOG_PROFILES),dogProfiles);assert.deepEqual(JSON.parse(row.CAT_PROFILES),catProfiles);
+  assert.deepEqual(JSON.parse(row.DOG_PROFILES).map(({photoUrl,photoFileId,...pet})=>pet),dogProfiles.map(({photo,...pet})=>pet));assert.deepEqual(JSON.parse(row.CAT_PROFILES).map(({photoUrl,photoFileId,...pet})=>pet),catProfiles.map(({photo,...pet})=>pet));
   assert.match(row.DOG_BRAND_REASON,/Price/);assert.match(row.CAT_BRAND_REASON,/vet/);
   assert.equal(row.DOG_AGE,'PUPPY, ADULT');assert.equal(row.CAT_AGE,'KITTEN, ADULT');
   assert.equal(r.ticket.samples.length,3,'each applicable variant is assigned once');
@@ -268,7 +268,7 @@ test('mixed puppy/adult and kitten/adult profiles keep separate brands and reaso
 });
 
 test('new pet profiles require every age, dog size, brand and reason',()=>{
- const g=fresh();const profile={name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Pet likes it'};
+ const g=fresh();const profile={name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Pet likes it'};
  for(const key of ['name','age','size','brand','reason'])assert.equal(g.call('register',dogReg({dog:{profiles:[{...profile,[key]:''}]}})).error,'BAD_PET_DETAILS',key);
  assert.equal(g.table('REGISTRATIONS').length,0);
 });
@@ -276,7 +276,7 @@ test('new pet profiles require every age, dog size, brand and reason',()=>{
 
 test('three puppies, three adult dogs and three cats reserve and release only three packs', () => {
  const g=fresh();
- const profile=(name,age,size)=>({name,age,size,brand:'Other',reason:'Pet likes it'});
+ const profile=(name,age,size)=>({name,age,size,brand:'Other',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Pet likes it'});
  const dogs=[...Array.from({length:3},(_,i)=>profile('Pup '+i,'PUPPY','SMALL')),...Array.from({length:3},(_,i)=>profile('Dog '+i,'ADULT','LARGE'))];
  const cats=Array.from({length:3},(_,i)=>profile('Cat '+i,'ADULT',''));
  const t=g.call('register',dogReg({petType:'BOTH',dog:{profiles:dogs},cat:{profiles:cats}})).ticket;
@@ -297,9 +297,9 @@ test('three puppies, three adult dogs and three cats reserve and release only th
 });
 
 test('small and large adult dogs receive their distinct variants once; partial stock-out is flagged',()=>{
- const g=fresh();const dog=(age,size)=>({name:'Pet',age,size,brand:'Pedigree',reason:'Price / budget'});
+ const g=fresh();const dog=(age,size)=>({name:'Pet',age,size,brand:'Pedigree',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Price / budget'});
  const profiles=[dog('PUPPY','SMALL'),dog('ADULT','SMALL'),dog('ADULT','LARGE'),dog('ADULT','MEDIUM')];
- const t=g.call('register',dogReg({petType:'BOTH',dog:{profiles},cat:{profiles:[{name:'Cat',age:'ADULT',brand:'Whiskas',reason:'Pet likes it'}]}})).ticket;
+ const t=g.call('register',dogReg({petType:'BOTH',dog:{profiles},cat:{profiles:[{name:'Cat',age:'ADULT',brand:'Whiskas',photo:'data:image/jpeg;base64,/9j/AA==',reason:'Pet likes it'}]}})).ticket;
  assert.equal(t.samples.length,4);assert.equal(new Set(t.samples.map(s=>s.id)).size,4);
  const g2=fresh();for(const r of g2.sheets.get('STOCK').rows)if(r[1]==='RR'&&r[2]==='NC_PUPPY_LAMB')r[3]=0;
  const partial=g2.call('register',dogReg({dog:{profiles}})).ticket;
@@ -329,4 +329,19 @@ test('stock depleting after registration is checked under the claim lock and rec
  assert.equal(r.result,'OOS');assert.equal(r.ok,true);assert.equal(g.table('REGISTRATIONS')[0].STATUS,'WAITING');
  assert.equal(g.table('REDEMPTIONS')[0].PRODUCTS_GIVEN,'');assert.equal(g.call('status',{condoId:'RR'}).stock.find(s=>s.id==='NC_SMALL_BREED').given,0);
  assert.equal(g.call('redeem',{redemptionId:'wrong-oos',code:t.code,staffCode:'PM01',outOfStock:true,oosProducts:['MJ_ADULT_SALMON']}).error,'BAD_OOS_PRODUCTS');
+});
+
+test('pet photo is mandatory for new profiles; group photo saves once and retry keeps original ticket',()=>{
+ const g=fresh(),pet={name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Pet likes it'};
+ assert.equal(g.call('register',dogReg({dog:{profiles:[pet]}})).error,'BAD_PET_DETAILS');
+ const photo='data:image/jpeg;base64,/9j/AA==',request=dogReg({regId:'pet-photo-retry',dog:{profiles:[{...pet,photo},{...pet,name:'Pup 2',photo}]}});
+ const first=g.call('register',request);assert.equal(first.ok,true);assert.equal(g.files.length,1);
+ const saved=JSON.parse(g.table('REGISTRATIONS')[0].DOG_PROFILES);assert.ok(saved[0].photoUrl);assert.ok(saved[0].photoFileId);assert.equal(saved[1].photoUrl,saved[0].photoUrl);assert.equal(saved[0].photo,undefined);
+ assert.equal(g.call('register',request).ticket.code,first.ticket.code);assert.equal(g.files.length,1);assert.equal(g.table('REGISTRATIONS').length,1);
+});
+test('photo storage failure blocks registration without reserving stock',()=>{
+ const g=fresh();g.ctx.savePhoto_=()=>({url:'',id:''});
+ const request=dogReg({dog:{profiles:[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Pet likes it',photo:'data:image/jpeg;base64,/9j/AA=='}]}});
+ assert.equal(g.call('register',request).error,'PET_PHOTO_SAVE_FAILED');assert.equal(g.table('REGISTRATIONS').length,0);
+ assert.equal(g.ctx.stockFor_('RR','2026-10-10').NC_PUPPY_LAMB.reserved,0);
 });

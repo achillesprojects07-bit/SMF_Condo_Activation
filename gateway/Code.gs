@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.4-oos-attempts';
+var VERSION = '1.5-pet-profile-photos';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -250,7 +250,7 @@ function condoInfo_(p) {
 function normalizePet_(pet, kind) {
   if (!Array.isArray(pet.profiles)) return pet;
   var list=pet.profiles;
-  if (!list.length || list.length>30 || list.some(function(x){return !x || !String(x.name||'').trim() || (kind==='DOG'?['PUPPY','ADULT']:['KITTEN','ADULT']).indexOf(x.age)<0 || (kind==='DOG'&&['SMALL','MEDIUM','LARGE'].indexOf(x.size)<0) || !String(x.brand||'').trim() || !String(x.reason||'').trim();})) return null;
+  if (!list.length || list.length>30 || list.some(function(x){return !x || !String(x.name||'').trim() || (kind==='DOG'?['PUPPY','ADULT']:['KITTEN','ADULT']).indexOf(x.age)<0 || (kind==='DOG'&&['SMALL','MEDIUM','LARGE'].indexOf(x.size)<0) || !String(x.brand||'').trim() || !String(x.reason||'').trim() || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(String(x.photo||'')) || String(x.photo).length>1500000;})) return null;
   function unique(k){return list.map(function(x){return String(x[k]||'');}).filter(function(x,i,a){return a.indexOf(x)===i;}).join(', ');}
   return {profiles:list,count:list.length,names:list.map(function(x){return x.name;}).join(', '),age:unique('age'),size:unique('size'),brand:unique('brand'),reason:unique('reason')};
 }
@@ -267,6 +267,7 @@ function register_(p) {
 
   var regs = read_('REGISTRATIONS');
   for (var i = 0; i < regs.length; i++) {
+    if (p.regId && regs[i].REG_ID === String(p.regId) && normMobile_(regs[i].MOBILE) === mobile && regs[i].CONDO_ID === condo.CONDO_ID) return {ok:true,ticket:ticketView_(regs[i],condo)};
     if (normMobile_(regs[i].MOBILE) === mobile && trainingRow_(regs[i]) === trainingCondo_(condo.CONDO_ID)) {
       return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one registration is allowed per mobile number, with one pack per applicable variant.' };
     }
@@ -275,9 +276,12 @@ function register_(p) {
   var petType = String(p.petType || '').toUpperCase();
   var hasDog = petType === 'DOG' || petType === 'BOTH', hasCat = petType === 'CAT' || petType === 'BOTH';
   if (!hasDog && !hasCat) return { ok: false, error: 'BAD_PET', message: 'Please choose Dog, Cat, or Dog & Cat.' };
+  if(p.requirePetPhotos && ((hasDog&&!Array.isArray((p.dog||{}).profiles)) || (hasCat&&!Array.isArray((p.cat||{}).profiles)))) return {ok:false,error:'BAD_PET_DETAILS',message:'Please complete a profile and add a photo for every pet.'};
   var dog = hasDog ? normalizePet_(p.dog || {}, 'DOG') : {}, cat = hasCat ? normalizePet_(p.cat || {}, 'CAT') : {};
-  if(!dog||!cat)return {ok:false,error:'BAD_PET_DETAILS',message:'Please complete the name, age, current food brand and reason for every pet, plus size for every dog.'};
+  if(!dog||!cat)return {ok:false,error:'BAD_PET_DETAILS',message:'Please complete the name, age, current food brand and reason for every pet, a clear pet photo, and size for every dog.'};
 
+  var photoSize=[dog,cat].reduce(function(total,pet){return total+(pet.profiles||[]).reduce(function(n,x){return n+String(x.photo||'').length;},0);},0);
+  if(photoSize>8000000)return {ok:false,error:'PHOTO_TOO_BIG',message:'The pet photos are too large. Please use smaller images.'};
   var stock = stockFor_(condo.CONDO_ID, date, regs);
   var eligible = [];
   function addVariant(id) { if (eligible.indexOf(id) < 0) eligible.push(id); }
@@ -292,6 +296,17 @@ function register_(p) {
   var gotSome = samples.length > 0;
 
   var code = nextClaimCode_(condo, regs);
+  var savedPetPhotos = {};
+  try {
+    [dog,cat].forEach(function(pet,kind){
+      if(!pet.profiles)return;
+      pet.profiles=pet.profiles.map(function(profile,index){
+        var photo=savedPetPhotos[profile.photo];
+        if(!photo){photo=savePhoto_(profile.photo,code+'_pet_'+(kind===0?'dog':'cat')+'_'+(index+1));if(!photo.url)throw new Error('Photo storage is unavailable.');savedPetPhotos[profile.photo]=photo;}
+        var saved={};Object.keys(profile).forEach(function(k){if(k!=='photo')saved[k]=profile[k];});saved.photoUrl=photo.url;saved.photoFileId=photo.id;return saved;
+      });
+    });
+  } catch(error){return {ok:false,error:'PET_PHOTO_SAVE_FAILED',message:'Your pet photos could not be saved. Please try again. Your registration has not been completed.'};}
   var row = {
     CLAIM_CODE: code, REG_ID: String(p.regId || Utilities.getUuid()), REGISTERED_AT: nowText_(), DATE: date,
     CONDO_ID: condo.CONDO_ID, CONDO_NAME: condo.CONDO_NAME, CONSENT: 'YES', PROMO_OPT_IN: p.promoOptIn === 'YES' ? 'YES' : 'NO',

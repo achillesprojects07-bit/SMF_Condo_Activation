@@ -28,7 +28,7 @@ export function json(body, status = 200) {
 
 export async function gateway(env, action, payload, fetchImpl = fetch) {
   if (!env.GATEWAY_URL || !env.GATEWAY_SECRET) throw new Error("Gateway is not configured.");
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000);
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), action === "register" ? 90000 : 30000);
   try {
     const res = await fetchImpl(env.GATEWAY_URL, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -119,8 +119,10 @@ export async function handleApi(request, env, deps = {}) {
       if (limited("reg|" + ip, 20, 10 * 60 * 1000)) return json({ ok: false, error: "SLOW_DOWN", message: "Too many attempts. Please wait a few minutes and try again." }, 429);
       const b = await body(request);
       if (!b) return json({ ok: false, error: "BAD_REQUEST", message: "Invalid form. Please try again." }, 400);
+      const petPhotos=[b.dog,b.cat].flatMap(p=>Array.isArray(p?.profiles)?p.profiles.map(x=>String(x?.photo||'')):[]);
+      if(petPhotos.some(photo=>photo.length>MAX_PHOTO_CHARS) || petPhotos.reduce((total,photo)=>total+photo.length,0)>8_000_000) return json({ok:false,error:'PHOTO_TOO_BIG',message:'The pet photos are too large. Please use smaller images.'},413);
       const payload = {
-        condoId: String(b.condoId || "").slice(0, 20), regId: String(b.regId || "").slice(0, 64),
+        requirePetPhotos: true, condoId: String(b.condoId || "").slice(0, 20), regId: String(b.regId || "").slice(0, 64),
         consent: b.consent === "YES" ? "YES" : "NO", promoOptIn: b.promoOptIn === "YES" ? "YES" : "NO",
         name: String(b.name || "").trim().slice(0, 80), mobile: String(b.mobile || "").slice(0, 20),
         petType: String(b.petType || "").toUpperCase(), dog: clean(b.dog), cat: clean(b.cat)
@@ -180,7 +182,7 @@ export async function handleApi(request, env, deps = {}) {
     }
     return json({ ok: false, error: "NOT_FOUND" }, 404);
   } catch (e) {
-    return json({ ok: false, error: "SERVER", message: "Hindi maabot ang server. Subukan ulit. (" + String(e.message || e).slice(0, 120) + ")" }, 502);
+    return json({ ok: false, error: "SERVER", message: path === "/api/register" || path === "/api/condo" || path === "/api/my-ticket" ? "The server is unavailable. Please try again." : "Hindi maabot ang server. Subukan ulit. (" + String(e.message || e).slice(0, 120) + ")" }, 502);
   }
 }
 
@@ -192,7 +194,7 @@ function clean(x) {
     age: String(x.age || "").toUpperCase().slice(0, 10),
     size: String(x.size || "").toUpperCase().slice(0, 10),
     brand: String(x.brand || "").trim().slice(0, 60),
-    profiles: Array.isArray(x.profiles) ? x.profiles.slice(0,30).map(p => ({name:String(p.name||'').trim().slice(0,60),age:String(p.age||'').toUpperCase().slice(0,10),size:String(p.size||'').toUpperCase().slice(0,10),brand:String(p.brand||'').trim().slice(0,100),reason:String(p.reason||'').trim().slice(0,200)})) : undefined
+    profiles: Array.isArray(x.profiles) ? x.profiles.slice(0,30).map(p => ({name:String(p.name||'').trim().slice(0,60),age:String(p.age||'').toUpperCase().slice(0,10),size:String(p.size||'').toUpperCase().slice(0,10),brand:String(p.brand||'').trim().slice(0,100),reason:String(p.reason||'').trim().slice(0,200),photo:String(p.photo||'')})) : undefined
   };
 }
 

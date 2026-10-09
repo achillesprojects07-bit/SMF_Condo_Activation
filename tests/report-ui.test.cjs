@@ -42,3 +42,8 @@ test('OOS attempts appear separately without becoming distributed packs',async()
  const ui=await renderDashboard({...fixture,flags:[attempt],redemptions:[attempt]});ui.tab('records');
  assert.match(ui.main.innerHTML,/Customers tried to redeem — OOS \(1\)/);assert.match(ui.main.innerHTML,/Dog sample 150 g/);assert.match(ui.main.innerHTML,/2026-10-09 13:00:00/);assert.doesNotMatch(ui.main.innerHTML,/Claim attempts to review/);
 });
+
+test('resident records show each pet photo link beside its pet name',async()=>{
+ const record={...fixture.registrations[0],DOG_PROFILES:JSON.stringify([{name:'Pup',age:'PUPPY',brand:'Pedigree',reason:'Pet likes it',photoUrl:'https://drive.google.com/file/d/pet-test'}])};
+ const ui=await renderDashboard({...fixture,registrations:[record]});ui.tab('records');assert.match(ui.main.innerHTML,/Pup photo/);assert.match(ui.main.innerHTML,/https:\/\/drive.google.com\/file\/d\/pet-test/);assert.match(ui.main.innerHTML,/View pet photo/);
+});

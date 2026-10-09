@@ -6,7 +6,7 @@
   var TICKET_KEY = "smfc_ticket_v1";
   var state = { consent: "", petType: "", dogCount: 1, catCount: 1, dogAge: "", dogSize: "", dogBrand: "", catAge: "", catBrand: "", promo: "" };
   var info = null;
-  var profiles = {dog: [], cat: []};
+  var profiles = {dog: [], cat: []}, pendingRegId = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -83,16 +83,31 @@
 
   function isOther(v) { return /^iba/i.test(v || "") || /other/i.test(v || ""); }
 
-  function petBlank() { return {name:'', age:'', size:'', brand:'', brandOther:'', reason:'', reasonOther:''}; }
-  function profileValid(p, pet) { return p.name.trim() && p.age && (pet === 'cat' || p.size) && p.brand && (!isOther(p.brand) || p.brandOther.trim()) && p.reason && (p.reason !== 'Other' || p.reasonOther.trim()); }
+  function petBlank() { return {name:'', age:'', size:'', brand:'', brandOther:'', reason:'', reasonOther:'', photo:'', photoLoading:false}; }
+  function profileValid(p, pet) { return !!p.photo && !p.photoLoading && p.name.trim() && p.age && (pet === 'cat' || p.size) && p.brand && (!isOther(p.brand) || p.brandOther.trim()) && p.reason && (p.reason !== 'Other' || p.reasonOther.trim()); }
   function options(list, selected) { return '<option value="">Choose an answer</option>' + list.map(function(x){var v=Array.isArray(x)?x[0]:x, label=Array.isArray(x)?x[1]:x;return '<option value="'+esc(v)+'"'+(v===selected?' selected':'')+'>'+esc(label)+'</option>';}).join(''); }
+  function petPhotoFields(p,pet,i) {
+    var attrs=' data-pet="'+pet+'" data-index="'+i+'" data-photo="true"';
+    return '<div class="petPhoto"><strong>Pet photo (required)</strong><p class="qSub">Take a photo or upload one from your gallery. A clear group photo may be used for each pet shown in it.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><label class="btn secondary">Take photo<input type="file" accept="image/*" capture="environment"'+attrs+' hidden></label><label class="btn secondary">Upload from gallery<input type="file" accept="image/*"'+attrs+' hidden></label></div><img class="photoPrev petPreview" alt="Pet photo preview"'+(p.photo?' src="'+p.photo+'"':' hidden')+'><div class="petPhotoStatus helper" role="status">'+(p.photoLoading?'Preparing photo…':p.photo?'Photo ready':'No photo added yet')+'</div></div>';
+  }
+  async function preparePetPhoto(file) {
+    if(!/^image\//.test(file.type))throw new Error('Please choose an image file.');
+    var url=URL.createObjectURL(file),img=new Image();
+    try {
+      await new Promise(function(resolve,reject){img.onload=resolve;img.onerror=function(){reject(new Error('This image could not be opened. Please choose another photo or take a new one.'));};img.src=url;});
+      var scale=Math.min(1,960/Math.max(img.naturalWidth,img.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      var photo=canvas.toDataURL('image/jpeg',0.65);
+      if(photo.length>1500000)throw new Error('The photo is too large. Please choose a smaller image.');
+      return photo;
+    } finally {URL.revokeObjectURL(url);}
+  }
   function renderPets(pet) {
     var n=state[pet+'Count']; while(profiles[pet].length<n) profiles[pet].push(petBlank());
     profiles[pet].length=n;
     $(pet+'Profiles').innerHTML=profiles[pet].map(function(p,i){
       var key=pet+'Profile'+i, brands=(info.brands||[]).filter(function(b){return b.petType===pet.toUpperCase()||b.petType==='BOTH';}).map(function(b){return b.brand;});
       function field(k,label,list) {return '<label style="display:block;margin:14px 0">'+label+(list?'<select class="big" data-pet="'+pet+'" data-index="'+i+'" data-field="'+k+'">'+options(list,p[k])+'</select>':'<input class="big" maxlength="60" data-pet="'+pet+'" data-index="'+i+'" data-field="'+k+'" value="'+esc(p[k])+'">')+'</label>';}
-      return '<section class="q" data-q="'+key+'"><div class="qTitle">'+(pet==='dog'?'Dog':'Cat')+' '+(i+1)+'</div>'+field('name',"Pet's name")+field('age','Age',pet==='dog'?[['PUPPY','Puppy (below 1 yr)'],['ADULT','Adult (1 yr+)']]:[['KITTEN','Kitten (below 1 yr)'],['ADULT','Adult (1 yr+)']])+(pet==='dog'?field('size','Size',[['SMALL','Small'],['MEDIUM','Medium'],['LARGE','Large']]):'')+field('brand','Current '+pet+' food brand',brands)+ '<div data-extra="brand"'+(!isOther(p.brand)?' hidden':'')+'>'+field('brandOther','Other brand name')+'</div>'+field('reason','Why do you use this food for this '+pet+'?',['Pet likes it','Price / budget','Recommended by vet','Recommended by family / friends','Easy to find','Nutrition / health needs','Used to this food','Other'])+'<div data-extra="reason"'+(p.reason!=='Other'?' hidden':'')+'>'+field('reasonOther','Other reason')+'</div></section>';
+      return '<section class="q" data-q="'+key+'"><div class="qTitle">'+(pet==='dog'?'Dog':'Cat')+' '+(i+1)+'</div>'+field('name',"Pet's name")+petPhotoFields(p,pet,i)+field('age','Age',pet==='dog'?[['PUPPY','Puppy (below 1 yr)'],['ADULT','Adult (1 yr+)']]:[['KITTEN','Kitten (below 1 yr)'],['ADULT','Adult (1 yr+)']])+(pet==='dog'?field('size','Size',[['SMALL','Small'],['MEDIUM','Medium'],['LARGE','Large']]):'')+field('brand','Current '+pet+' food brand',brands)+ '<div data-extra="brand"'+(!isOther(p.brand)?' hidden':'')+'>'+field('brandOther','Other brand name')+'</div>'+field('reason','Why do you use this food for this '+pet+'?',['Pet likes it','Price / budget','Recommended by vet','Recommended by family / friends','Easy to find','Nutrition / health needs','Used to this food','Other'])+'<div data-extra="reason"'+(p.reason!=='Other'?' hidden':'')+'>'+field('reasonOther','Other reason')+'</div></section>';
     }).join('');
   }
   function answered() {
@@ -115,10 +130,18 @@
     renderPets('dog');renderPets('cat');
     function profileInput(e) {
       var t=e.target;
-      if(!t.dataset.pet)return;
+      if(!t.dataset.pet || t.dataset.photo)return;
       var p=profiles[t.dataset.pet][Number(t.dataset.index)];p[t.dataset.field]=t.value;
       var card=t.closest('.q');card.querySelector('[data-extra="brand"]').hidden=!isOther(p.brand);card.querySelector('[data-extra="reason"]').hidden=p.reason!=='Other';refresh();
     }
+    main.addEventListener('change',async function(e){
+      var input=e.target;if(!input.dataset.photo)return;var file=input.files&&input.files[0];if(!file)return;
+      var pet=input.dataset.pet,index=Number(input.dataset.index),p=profiles[pet][index],box=input.closest('.petPhoto');
+      var photoToken=uuid();p.photoToken=photoToken;p.photoLoading=true;box.querySelector('.petPhotoStatus').textContent='Preparing photo…';refresh();
+      try {var photo=await preparePetPhoto(file);if(profiles[pet][index]!==p || p.photoToken!==photoToken)return;p.photo=photo;var preview=box.querySelector('.petPreview');preview.src=photo;preview.hidden=false;box.querySelector('.petPhotoStatus').textContent='Photo ready';}
+      catch(error){if(p.photoToken===photoToken)box.querySelector('.petPhotoStatus').textContent=error.message;}
+      finally {if(p.photoToken===photoToken)p.photoLoading=false;input.value='';refresh();}
+    });
     main.addEventListener('input',profileInput);main.addEventListener('change',profileInput);
     main.querySelectorAll(".choices").forEach(function (group) {
       group.addEventListener("click", function (e) {
@@ -154,10 +177,10 @@
     var btn = $("submit");
     btn.disabled = true; btn.textContent = "Saving…";
     function petPayload(pet) {
-      var list=profiles[pet].map(function(p){return {name:p.name.trim(),age:p.age,size:pet==='dog'?p.size:'',brand:isOther(p.brand)?'Other: '+p.brandOther.trim():p.brand,reason:p.reason==='Other'?'Other: '+p.reasonOther.trim():p.reason};});
+      var list=profiles[pet].map(function(p){return {name:p.name.trim(),age:p.age,size:pet==='dog'?p.size:'',brand:isOther(p.brand)?'Other: '+p.brandOther.trim():p.brand,reason:p.reason==='Other'?'Other: '+p.reasonOther.trim():p.reason,photo:p.photo};});
       return {profiles:list,count:list.length};
     }
-    var regId = uuid();
+    var regId = pendingRegId || (pendingRegId = uuid());
     var payload = {
       condoId: condoId, regId: regId, consent: "YES", promoOptIn: state.promo,
       name: $("name").value.trim(), mobile: normMobile($("mobile").value), petType: state.petType,
