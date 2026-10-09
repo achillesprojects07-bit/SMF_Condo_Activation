@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.0';
+var VERSION = '1.1-training-exclusion';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -23,9 +23,9 @@ var TABLES = {
     'CONSENT', 'PROMO_OPT_IN', 'RESIDENT_NAME', 'MOBILE', 'PET_TYPE',
     'DOG_COUNT', 'DOG_NAMES', 'DOG_AGE', 'DOG_SIZE', 'DOG_BRAND',
     'CAT_COUNT', 'CAT_NAMES', 'CAT_AGE', 'CAT_BRAND',
-    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL'],
+    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE'],
   REDEMPTIONS: ['REDEMPTION_ID', 'CLAIM_CODE', 'DATE', 'CONDO_ID', 'STAFF_CODE', 'BA_NAME',
-    'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID']
+    'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID', 'DATA_TYPE']
 };
 
 var PRODUCT_SEED = [
@@ -179,7 +179,12 @@ function findCondo_(id) {
 }
 
 /** Is this condo running today? (TEST_MODE = YES in SETTINGS lets any date through, for practice.) */
+function trainingCondo_(id) { return String(id || '').trim().toUpperCase() === 'TRAIN'; }
+function trainingStaff_(code) { return /^DEMO-\d+$/i.test(String(code || '').trim()); }
+function trainingRow_(r) { return String(r.DATA_TYPE || '').toUpperCase() === 'TRAINING' || trainingCondo_(r.CONDO_ID) || trainingStaff_(r.STAFF_CODE); }
+
 function runningToday_(condoId, date) {
+  if (trainingCondo_(condoId)) return read_('SCHEDULE').some(function (s) { return trainingCondo_(s.CONDO_ID) && trainingStaff_(s.STAFF_CODE); });
   if (String(settings_().TEST_MODE || '').toUpperCase() === 'YES') return true;
   return read_('SCHEDULE').some(function (r) { return r.DATE === date && r.CONDO_ID.toUpperCase() === condoId.toUpperCase(); });
 }
@@ -198,11 +203,12 @@ function stockFor_(condoId, date, regs) {
     }
   });
   // Practice mode on a day with no STOCK rows (e.g. BA training): use the normal daily allocation.
-  if (!found && String(settings_().TEST_MODE || '').toUpperCase() === 'YES') {
+  if (!found && (trainingCondo_(condoId) || String(settings_().TEST_MODE || '').toUpperCase() === 'YES')) {
     Object.keys(DAILY_STOCK_SEED).forEach(function (id) { if (out[id]) out[id].allocated = DAILY_STOCK_SEED[id]; });
   }
   (regs || read_('REGISTRATIONS')).forEach(function (r) {
     if (r.DATE !== date || r.CONDO_ID.toUpperCase() !== condoId.toUpperCase()) return;
+    if (!trainingCondo_(condoId) && trainingRow_(r)) return;
     if (r.STATUS === 'CLAIMED') {
       String(r.SAMPLES_GIVEN || '').split(',').forEach(function (id) { id = id.trim(); if (out[id]) out[id].given++; });
     } else if (r.STATUS === 'WAITING') {
@@ -256,6 +262,7 @@ function condoInfo_(p) {
 }
 
 function register_(p) {
+  ensureColumns_('REGISTRATIONS');
   var condo = findCondo_(p.condoId);
   if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'We could not find this condo. Please scan the QR code at the booth again.' };
   var date = today_();
@@ -266,7 +273,7 @@ function register_(p) {
 
   var regs = read_('REGISTRATIONS');
   for (var i = 0; i < regs.length; i++) {
-    if (normMobile_(regs[i].MOBILE) === mobile) {
+    if (normMobile_(regs[i].MOBILE) === mobile && trainingRow_(regs[i]) === trainingCondo_(condo.CONDO_ID)) {
       return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one free pack is allowed per mobile number.' };
     }
   }
@@ -290,7 +297,7 @@ function register_(p) {
     DOG_AGE: hasDog ? String(dog.age || '') : '', DOG_SIZE: hasDog ? String(dog.size || '') : '', DOG_BRAND: hasDog ? String(dog.brand || '').slice(0, 60) : '',
     CAT_COUNT: hasCat ? Number(cat.count) || 1 : '', CAT_NAMES: hasCat ? String(cat.names || '').slice(0, 120) : '',
     CAT_AGE: hasCat ? String(cat.age || '') : '', CAT_BRAND: hasCat ? String(cat.brand || '').slice(0, 60) : '',
-    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, STATUS: gotSome ? 'WAITING' : 'NO_STOCK'
+    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, STATUS: gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
   };
   append_('REGISTRATIONS', row);
   return { ok: true, ticket: ticketView_(row, condo) };
@@ -318,7 +325,7 @@ function staffLogin_(p) {
   var pad4 = function (v) { v = String(v).trim(); return /^\d{1,4}$/.test(v) ? ('0000' + v).slice(-4) : v; };
   if (pad4(staff.PIN) !== pad4(pin)) return { ok: false, error: 'BAD_PIN', message: 'Mali ang PIN.' };
   var date = today_(), test = String(settings_().TEST_MODE || '').toUpperCase() === 'YES';
-  var sched = read_('SCHEDULE').filter(function (s) { return s.STAFF_CODE.toUpperCase() === code && (s.DATE === date || test); });
+  var sched = read_('SCHEDULE').filter(function (s) { return s.STAFF_CODE.toUpperCase() === code && (s.DATE === date || test || (trainingStaff_(code) && trainingCondo_(s.CONDO_ID))); });
   sched.sort(function (a, b) { return (a.DATE === date ? 0 : 1) - (b.DATE === date ? 0 : 1); });
   if (!sched.length) return { ok: false, error: 'NO_ASSIGNMENT', message: 'Wala kang naka-assign na condo ngayong araw. Tawagan ang supervisor.' };
   var condo = findCondo_(sched[0].CONDO_ID);
@@ -360,6 +367,7 @@ function redeem_(p) {
   if ((p.customerPhoto && p.photoConsent !== 'YES') || (p.photoConsent === 'YES' && !p.customerPhoto) || (p.photoConsent != null && ['YES', 'NO'].indexOf(p.photoConsent) < 0)) return { ok: false, error: 'PHOTO_CONSENT', message: 'I-check ang consent at customer photo.' };
   ensureColumns_('REGISTRATIONS'); ensureColumns_('REDEMPTIONS');
   var regs = read_('REGISTRATIONS'), reg = findReg_(p.code, regs);
+  if (reg && trainingStaff_(p.staffCode) !== trainingRow_(reg)) return { ok: false, error: 'WRONG_ASSIGNMENT', message: 'Gamitin ang ticket para sa iyong assigned condo. Training accounts use TRAIN tickets.' };
   var products = {};
   products_().forEach(function (x) { products[x.PRODUCT_ID] = x; });
   var given = (p.products || []).filter(function (id) { return products[id]; });
@@ -382,7 +390,8 @@ function redeem_(p) {
     CONDO_ID: p.condoId || '', STAFF_CODE: p.staffCode || '', BA_NAME: p.staffName || '',
     PRODUCTS_GIVEN: given.join(', '), RESULT: result, PHOTO_URL: photo.url, PHOTO_FILE_ID: photo.id,
     PHONE_SAVED_AT: String(p.phoneSavedAt || ''), SERVER_SAVED_AT: nowText_(), NOTE: note,
-    PHOTO_CONSENT: p.photoConsent || 'NOT_RECORDED', CUSTOMER_PHOTO_URL: customerPhoto.url, CUSTOMER_PHOTO_FILE_ID: customerPhoto.id
+    PHOTO_CONSENT: p.photoConsent || 'NOT_RECORDED', CUSTOMER_PHOTO_URL: customerPhoto.url, CUSTOMER_PHOTO_FILE_ID: customerPhoto.id,
+    DATA_TYPE: trainingStaff_(p.staffCode) || trainingCondo_(p.condoId) || (reg && trainingRow_(reg)) ? 'TRAINING' : 'LIVE'
   });
   if (result === 'OK') {
     update_('REGISTRATIONS', reg._row, {
@@ -398,7 +407,7 @@ function status_(p) {
   var condo = findCondo_(p.condoId);
   if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'Condo not found.' };
   var date = today_(), regs = read_('REGISTRATIONS');
-  var mine = regs.filter(function (r) { return r.DATE === date && r.CONDO_ID.toUpperCase() === condo.CONDO_ID.toUpperCase(); });
+  var mine = regs.filter(function (r) { return r.DATE === date && r.CONDO_ID.toUpperCase() === condo.CONDO_ID.toUpperCase() && (trainingCondo_(condo.CONDO_ID) || !trainingRow_(r)); });
   var stock = stockFor_(condo.CONDO_ID, date, regs);
   return {
     ok: true, date: date,
@@ -417,12 +426,17 @@ function checkReportPasscode_(p) {
 
 function report_() {
   var strip = function (rows) { return rows.map(function (r) { var o = {}; Object.keys(r).forEach(function (k) { if (k !== '_row') o[k] = r[k]; }); return o; }); };
+  var regs = read_('REGISTRATIONS'), reds = read_('REDEMPTIONS'), excluded = {};
+  regs.forEach(function (r) { if (trainingRow_(r)) excluded[r.CLAIM_CODE.toUpperCase()] = true; });
+  // Retain exclusion for older claims made before DATA_TYPE existed.
+  reds.forEach(function (r) { if (trainingRow_(r) && r.RESULT === 'OK') excluded[r.CLAIM_CODE.toUpperCase()] = true; });
+  var live = function (r) { return !trainingRow_(r) && !excluded[String(r.CLAIM_CODE || '').toUpperCase()]; };
   return {
     ok: true, today: today_(),
-    condos: strip(read_('CONDOS')), schedule: strip(read_('SCHEDULE')).map(function (s) { return { DATE: s.DATE, CONDO_ID: s.CONDO_ID, STAFF_CODE: s.STAFF_CODE }; }),
-    stock: strip(read_('STOCK')), products: strip(read_('PRODUCTS')),
-    registrations: strip(read_('REGISTRATIONS')).map(function (r) { r.MOBILE = String(r.MOBILE).replace(/^'/, ''); return r; }),
-    redemptions: strip(read_('REDEMPTIONS'))
+    condos: strip(read_('CONDOS').filter(live)), schedule: strip(read_('SCHEDULE').filter(live)).map(function (s) { return { DATE: s.DATE, CONDO_ID: s.CONDO_ID, STAFF_CODE: s.STAFF_CODE }; }),
+    stock: strip(read_('STOCK').filter(live)), products: strip(read_('PRODUCTS')),
+    registrations: strip(regs.filter(live)).map(function (r) { r.MOBILE = String(r.MOBILE).replace(/^'/, ''); return r; }),
+    redemptions: strip(reds.filter(live))
   };
 }
 
@@ -444,7 +458,7 @@ function setupSheets() {
   if (read_('PRODUCTS').length === 0) PRODUCT_SEED.forEach(function (r) { sheet_('PRODUCTS').appendRow(r); });
   if (read_('BRANDS').length === 0) BRAND_SEED.forEach(function (r) { sheet_('BRANDS').appendRow([r[0], r[1], 'ACTIVE']); });
   if (read_('SETTINGS').length === 0) {
-    sheet_('SETTINGS').appendRow(['TEST_MODE', 'YES', 'YES = practice on any date. Set to NO before the real event.']);
+    sheet_('SETTINGS').appendRow(['TEST_MODE', 'NO', 'Keep NO for live operation. Training accounts use the TRAIN assignment.']);
     sheet_('SETTINGS').appendRow(['REPORT_PASSCODE', '', 'Passcode the client types to open the report page (8+ characters).']);
   }
   if (read_('CONDOS').length === 0) {
