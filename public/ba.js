@@ -1,4 +1,4 @@
-/* BA app: sign in, scan the resident's ticket, take a photo, tap "Sample given". Works offline (saves on the phone). */
+/* BA app: sign in, photograph the resident's ticket, record photo consent, tap "Sample given". Works offline (saves on the phone). */
 (function () {
   "use strict";
   var main = document.getElementById("main"), who = document.getElementById("who"), net = document.getElementById("net");
@@ -80,13 +80,13 @@
     main.innerHTML =
       (session.testMode ? '<div class="warnbox" style="margin:0 0 12px">PRACTICE MODE (TEST_MODE = YES sa sheet)</div>' : "") +
       '<div id="queueNote" class="queueNote" hidden></div>' +
-      '<button id="scan" class="btn primary huge" type="button" style="margin-top:0">📷 I-scan ang ticket</button>' +
+      '<button id="scan" class="btn primary huge" type="button" style="margin-top:0">📷 Kunan ang claim screenshot</button>' +
       '<div class="card" style="margin-top:12px"><div class="cardTitle">O i-type ang ticket number</div><div class="codeRow"><input id="typed" class="big" placeholder="RR-0001" autocapitalize="characters" autocomplete="off"><button id="find" class="btn dark" type="button">Hanapin</button></div></div>' +
       '<div class="card"><div class="cardTitle">Ngayong araw • ' + esc(session.condo.name) + '</div><div class="stats"><div class="stat"><b id="sReg">–</b><span>Registered</span></div><div class="stat"><b id="sClaim">–</b><span>Na-claim</span></div><div class="stat"><b id="sWait">–</b><span>Naghihintay</span></div></div></div>' +
       '<div class="card"><div class="cardTitle">Natitirang sample (stock left)</div><div id="stock"><div class="helper">Loading…</div></div></div>' +
       '<div class="card"><div class="cardTitle">Huling na-claim sa phone na ito</div><div id="recent" class="recent"></div></div>' +
       '<button id="out" class="linkBtn" type="button">Sign out</button>';
-    $("scan").onclick = scanScreen;
+    $("scan").onclick = ticketPhotoScreen;
     $("find").onclick = function () { var c = $("typed").value.trim().toUpperCase(); if (c) claimScreen({ code: c }); };
     $("out").onclick = function () { signOut(false); };
     renderRecent();
@@ -130,41 +130,24 @@
     return null;
   }
 
-  async function scanScreen() {
-    main.innerHTML =
-      '<div class="scanBox"><video id="vid" playsinline muted></video><div class="frame"></div></div>' +
-      '<div class="helper center" id="scanMsg">Itapat ang camera sa QR code ng ticket.</div>' +
-      '<button id="cancel" class="btn secondary" type="button" style="margin-top:14px">Bumalik</button>';
+  function ticketPhotoScreen() {
+    stopCamera();
+    main.innerHTML = '<div class="hero"><div class="heroTitle">Photo ng claim screenshot</div><div class="heroSub">Kunan ang claim screenshot sa phone ng resident. Isama ang buong QR code, malinaw at walang glare. Automatic babasahin ng app ang ticket.</div></div>' +
+      '<label class="btn primary huge" style="text-align:center">📷 Kunan ng photo<input id="ticketCam" type="file" accept="image/*" capture="environment" hidden></label>' +
+      '<div id="photoMsg" class="helper center" role="status"></div><button id="cancel" class="btn secondary" type="button">Bumalik</button>';
     $("cancel").onclick = home;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-    } catch (e) {
-      $("scanMsg").innerHTML = '<span style="color:#b42318">Hindi mabuksan ang camera. I-allow ang camera, o i-type na lang ang ticket number.</span>';
-      return;
-    }
-    var v = $("vid"); v.srcObject = stream; await v.play().catch(function () { });
-    scanning = true;
-    var detector = ("BarcodeDetector" in window) ? new window.BarcodeDetector({ formats: ["qr_code"] }) : null;
-    var canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", { willReadFrequently: true });
-    async function tick() {
-      if (!scanning) return;
-      var text = null;
+    $("ticketCam").onchange = async function () {
+      var file = this.files && this.files[0]; if (!file) return;
+      this.disabled = true;
+      var msg = $("photoMsg"); msg.textContent = "Binabasa ang ticket…";
       try {
-        if (v.readyState >= 2) {
-          if (detector) { var codes = await detector.detect(v); if (codes.length) text = codes[0].rawValue; }
-          else {
-            var w = 480, h = Math.round(v.videoHeight / v.videoWidth * 480) || 480;
-            canvas.width = w; canvas.height = h; ctx.drawImage(v, 0, 0, w, h);
-            var img = ctx.getImageData(0, 0, w, h), r = window.jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
-            if (r) text = r.data;
-          }
-        }
-      } catch (e) { }
-      var parsed = text && parseQr(text);
-      if (parsed) { if (navigator.vibrate) navigator.vibrate(80); stopCamera(); claimScreen(parsed); return; }
-      setTimeout(tick, 150);
-    }
-    tick();
+        var found = await SMFTicketPhoto.read(file);
+        if (!found) throw new Error("Hindi mabasa ang QR. Kunan ulit nang mas malinaw, o bumalik at i-type ang ticket number.");
+        found.ticketPhoto = await compressPhoto(file);
+        if (!msg.isConnected) return;
+        claimScreen(found);
+      } catch (e) { if (msg.isConnected) { msg.textContent = e.message; $("ticketCam").disabled = false; $("ticketCam").value = ""; } }
+    };
   }
 
   /* ---------- claim ---------- */
@@ -184,24 +167,46 @@
   }
 
   async function claimScreen(found) {
-    var code = found.code, chosen = {}, photo = "", blocked = false, offline = false;
+    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false;
     (found.samples || []).forEach(function (id) { chosen[id] = true; });
     main.innerHTML =
       '<div class="card"><div class="cardTitle">Ticket</div><div style="font-size:36px;font-weight:900;letter-spacing:2px">' + esc(code) + '</div><div id="tinfo" class="helper" style="margin-top:4px">Chine-check…</div></div>' +
       '<div id="warn"></div>' +
       '<section class="q" data-q="products"><div class="qTitle">Ibibigay na sample</div><div class="qSub">Naka-check na ang para sa ticket. Palitan lang kung kailangan.</div><div class="choices" id="prods" style="grid-template-columns:1fr"></div></section>' +
-      '<section class="q" data-q="photo"><div class="qTitle">Picture ng ticket + sample</div><div class="qSub">Kunan ang phone ng resident (kita ang number) kasama ang sample.</div>' +
+      '<section class="q" data-q="photo"><div class="qTitle">Photo ng claim screenshot</div><div class="qSub">Kita dapat ang ticket number at QR sa phone ng resident. Kung nakunan na, hindi na kailangang ulitin.</div>' +
       '<label class="btn secondary" style="text-align:center">📷 Kunan ng picture<input id="cam" type="file" accept="image/*" capture="environment" hidden></label><img id="prev" class="photoPrev" hidden alt=""></section>' +
+      '<section class="q" data-q="consent"><div class="qTitle">Consent para sa customer photo</div><div class="qSub">“Puwede po ba kayong kunan ng photo kasama ang free sample, para sa documentation ng SMF Condo Sampling? Kasama rin po ang furbaby kung nandito. Optional po ito; makukuha ninyo ang sample kahit hindi kayo magpa-photo.”</div><div id="consentChoices" class="choices"><button type="button" class="choice" data-v="YES">Pumayag sa photo</button><button type="button" class="choice" data-v="NO">Hindi pumayag</button></div></section>' +
+      '<section class="q" id="customerSection" data-q="customerPhoto" hidden><div class="qTitle">Customer + free sample</div><div class="qSub">Kunan lang pagkatapos pumayag. Kita ang customer at free sample; isama ang furbaby kung present at posible.</div><label class="btn secondary" style="text-align:center">📷 Kunan ang customer + sample<input id="customerCam" type="file" accept="image/*" capture="environment" hidden disabled></label><img id="customerPrev" class="photoPrev" hidden alt="Preview ng customer photo"></section>' +
       '<div id="err" class="errbox" hidden></div>' +
       '<button id="give" class="btn primary huge" type="button">✓ Sample given</button>' +
       '<button id="back" class="btn secondary" type="button">Cancel</button>';
     $("back").onclick = home;
+    if (photo) { $("prev").src = photo; $("prev").hidden = false; }
+    $("consentChoices").onclick = function (e) {
+      var button = e.target.closest(".choice"); if (!button) return;
+      photoConsent = button.dataset.v;
+      $("consentChoices").querySelectorAll(".choice").forEach(function (b) { b.classList.toggle("selected", b.dataset.v === photoConsent); });
+      $("customerSection").hidden = photoConsent !== "YES";
+      $("customerCam").disabled = photoConsent !== "YES";
+      if (photoConsent !== "YES") { customerPhoto = ""; $("customerCam").value = ""; $("customerPrev").removeAttribute("src"); $("customerPrev").hidden = true; }
+      main.querySelector('[data-q="consent"]').classList.add("answered");
+      paint();
+    };
+    $("customerCam").onchange = async function () {
+      var file = this.files && this.files[0]; if (!file || photoConsent !== "YES") return;
+      try {
+        var compressed = await compressPhoto(file);
+        if (photoConsent !== "YES" || !$("customerPrev")) return;
+        customerPhoto = compressed; $("customerPrev").src = compressed; $("customerPrev").hidden = false; paint();
+      } catch (e) { toast(e.message); }
+    };
 
     function paint() {
       var ids = Object.keys(PRODUCT_NAMES);
       $("prods").innerHTML = ids.map(function (id) { return '<button type="button" class="choice' + (chosen[id] ? " selected" : "") + '" data-v="' + id + '">' + esc(productName(id)) + "</button>"; }).join("");
       main.querySelector('[data-q="products"]').classList.toggle("answered", Object.keys(chosen).some(function (k) { return chosen[k]; }));
       main.querySelector('[data-q="photo"]').classList.toggle("answered", !!photo);
+      main.querySelector('[data-q="customerPhoto"]').classList.toggle("answered", !!customerPhoto);
     }
     $("prods").onclick = function (e) { var b = e.target.closest(".choice"); if (!b) return; chosen[b.dataset.v] = !chosen[b.dataset.v]; paint(); };
     $("cam").onchange = async function () {
@@ -244,8 +249,10 @@
       var ids = Object.keys(chosen).filter(function (k) { return chosen[k]; }), err = $("err");
       if (blocked) { err.hidden = false; err.textContent = "Hindi pwedeng i-claim ang ticket na ito."; return; }
       if (!ids.length) { err.hidden = false; err.textContent = "Pumili ng sample na ibinigay."; main.querySelector('[data-q="products"]').classList.add("bad"); return; }
-      if (!photo) { err.hidden = false; err.textContent = "Kunan muna ng picture ang ticket + sample."; main.querySelector('[data-q="photo"]').classList.add("bad"); return; }
-      var item = { redemptionId: uuid(), code: code, products: ids, photo: photo, phoneSavedAt: new Date().toISOString() };
+      if (!photo) { err.hidden = false; err.textContent = "Kunan muna ng photo ang claim screenshot."; main.querySelector('[data-q="photo"]').classList.add("bad"); return; }
+      if (!photoConsent) { err.hidden = false; err.textContent = "Itala muna kung pumayag o hindi pumayag sa customer photo."; return; }
+      if (photoConsent === "YES" && !customerPhoto) { err.hidden = false; err.textContent = "Kunan muna ang customer kasama ang free sample."; return; }
+      var item = { photoConsent: photoConsent, customerPhoto: photoConsent === "YES" ? customerPhoto : "", redemptionId: uuid(), code: code, products: ids, photo: photo, phoneSavedAt: new Date().toISOString() };
       try { await SMFQueue.add(item); }
       catch (e) { err.hidden = false; err.textContent = "Hindi ma-save sa phone: " + e.message; return; }
       var recent = get(RECENT_KEY) || [];

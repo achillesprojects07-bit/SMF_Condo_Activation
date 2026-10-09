@@ -23,9 +23,9 @@ var TABLES = {
     'CONSENT', 'PROMO_OPT_IN', 'RESIDENT_NAME', 'MOBILE', 'PET_TYPE',
     'DOG_COUNT', 'DOG_NAMES', 'DOG_AGE', 'DOG_SIZE', 'DOG_BRAND',
     'CAT_COUNT', 'CAT_NAMES', 'CAT_AGE', 'CAT_BRAND',
-    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL'],
+    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL'],
   REDEMPTIONS: ['REDEMPTION_ID', 'CLAIM_CODE', 'DATE', 'CONDO_ID', 'STAFF_CODE', 'BA_NAME',
-    'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE']
+    'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID']
 };
 
 var PRODUCT_SEED = [
@@ -106,6 +106,14 @@ function read_(name) {
     if (any) out.push(obj);
   }
   return out;
+}
+
+// Append new columns without moving existing data; supports existing deployed sheets.
+function ensureColumns_(name) {
+  var sh = sheet_(name), headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(cellText_);
+  (TABLES[name] || []).forEach(function (key) {
+    if (headers.indexOf(key) < 0) { sh.getRange(1, headers.length + 1).setValue(key); headers.push(key); }
+  });
 }
 
 function headers_(name) {
@@ -349,6 +357,8 @@ function redeem_(p) {
   for (var i = 0; i < reds.length; i++) {
     if (reds[i].REDEMPTION_ID === rid) return { ok: true, already: true, result: reds[i].RESULT }; // phone re-sent the same save
   }
+  if ((p.customerPhoto && p.photoConsent !== 'YES') || (p.photoConsent === 'YES' && !p.customerPhoto) || (p.photoConsent != null && ['YES', 'NO'].indexOf(p.photoConsent) < 0)) return { ok: false, error: 'PHOTO_CONSENT', message: 'I-check ang consent at customer photo.' };
+  ensureColumns_('REGISTRATIONS'); ensureColumns_('REDEMPTIONS');
   var regs = read_('REGISTRATIONS'), reg = findReg_(p.code, regs);
   var products = {};
   products_().forEach(function (x) { products[x.PRODUCT_ID] = x; });
@@ -361,17 +371,23 @@ function redeem_(p) {
   var photo = { url: '', id: '' };
   try { photo = savePhoto_(p.photo, (p.code || 'unknown') + '_' + rid.slice(0, 8)); } catch (e) { note = (note ? note + '; ' : '') + 'Photo not saved: ' + e.message; }
 
+  var customerPhoto = { url: '', id: '' };
+  if (p.photoConsent === 'YES' && p.customerPhoto) {
+    try { customerPhoto = savePhoto_(p.customerPhoto, (p.code || 'unknown') + '_customer_' + rid.slice(0, 8)); if (!customerPhoto.url) throw new Error('Photo folder not configured'); }
+    catch (e) { return { ok: false, error: 'PHOTO_SAVE_FAILED', message: 'Hindi na-save ang customer photo. Subukan ulit.' }; }
+  }
   var date = today_();
   append_('REDEMPTIONS', {
     REDEMPTION_ID: rid, CLAIM_CODE: String(p.code || '').toUpperCase(), DATE: reg ? reg.DATE : date,
     CONDO_ID: p.condoId || '', STAFF_CODE: p.staffCode || '', BA_NAME: p.staffName || '',
     PRODUCTS_GIVEN: given.join(', '), RESULT: result, PHOTO_URL: photo.url, PHOTO_FILE_ID: photo.id,
-    PHONE_SAVED_AT: String(p.phoneSavedAt || ''), SERVER_SAVED_AT: nowText_(), NOTE: note
+    PHONE_SAVED_AT: String(p.phoneSavedAt || ''), SERVER_SAVED_AT: nowText_(), NOTE: note,
+    PHOTO_CONSENT: p.photoConsent || 'NOT_RECORDED', CUSTOMER_PHOTO_URL: customerPhoto.url, CUSTOMER_PHOTO_FILE_ID: customerPhoto.id
   });
   if (result === 'OK') {
     update_('REGISTRATIONS', reg._row, {
       STATUS: 'CLAIMED', CLAIMED_AT: nowText_(), CLAIMED_BY: (p.staffName || p.staffCode || ''),
-      SAMPLES_GIVEN: given.join(', '), PHOTO_URL: photo.url
+      SAMPLES_GIVEN: given.join(', '), PHOTO_URL: photo.url, PHOTO_CONSENT: p.photoConsent || 'NOT_RECORDED', CUSTOMER_PHOTO_URL: customerPhoto.url
     });
   }
   var msg = { OK: 'Saved', DUPLICATE: 'Na-claim na ang ticket na ito dati.', UNKNOWN_CODE: 'Walang ticket na ganitong number.', NO_PRODUCT: 'Walang napiling sample.' };
@@ -421,7 +437,7 @@ function setupSheets() {
       sh.appendRow(TABLES[name]);
       sh.getRange(1, 1, 1, TABLES[name].length).setFontWeight('bold').setBackground('#fff2a8');
       sh.setFrozenRows(1);
-    }
+    } else { ensureColumns_(name); }
   });
   ['REGISTRATIONS', 'SCHEDULE', 'STOCK', 'STAFF'].forEach(function (n) { sheet_(n).getRange('A:Z').setNumberFormat('@'); });
 
