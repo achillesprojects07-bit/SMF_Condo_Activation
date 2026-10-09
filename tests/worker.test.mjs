@@ -90,3 +90,27 @@ test('BA OOS flag and unavailable variants survive HTTP; reporting still counts 
   assert.equal(report.flags[0].RESULT,'OOS');assert.equal(report.days.find(d=>d.condoId==='RR').claimed,0);assert.equal(report.days.find(d=>d.condoId==='RR').given.NC_SMALL_BREED,undefined);
  }finally{s4.close();}
 });
+
+
+test('gateway recovers from transient read failures without retrying photo or stock writes', async () => {
+  const { gateway } = await import('../worker/src/index.js');
+  const env = { GATEWAY_URL: 'https://script.example/exec', GATEWAY_SECRET: 'test-only' };
+  for (const action of ['condo','staff_login','check_report_passcode','ticket','report']) {
+    for (const failure of [() => new Response('Busy', {status:503}), () => new Response('<html>Unavailable</html>'), () => {throw new Error('connection reset');}]) {
+      let calls=0;
+      const result=await gateway(env,action,{},async()=>++calls===1?failure():new Response('{"ok":true}'));
+      assert.equal(result.ok,true);assert.equal(calls,2);
+    }
+  }
+  for (const action of ['register','redeem']) {
+    let calls=0;
+    await assert.rejects(gateway(env,action,{},async()=>{calls++;return new Response('Busy',{status:503});}));
+    assert.equal(calls,1);
+  }
+  let calls=0;
+  const rejected=await gateway(env,'staff_login',{},async()=>{calls++;return new Response('{"ok":false,"error":"BAD_PIN"}');});
+  assert.equal(rejected.error,'BAD_PIN');assert.equal(calls,1);
+  calls=0;
+  await assert.rejects(gateway(env,'condo',{},async()=>{calls++;return new Response('{"ok":false,"error":"GATEWAY","message":"configuration error"}');}));
+  assert.equal(calls,1);
+});

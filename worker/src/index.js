@@ -28,16 +28,34 @@ export function json(body, status = 200) {
 
 export async function gateway(env, action, payload, fetchImpl = fetch) {
   if (!env.GATEWAY_URL || !env.GATEWAY_SECRET) throw new Error("Gateway is not configured.");
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), action === "register" ? 90000 : 30000);
-  try {
-    const res = await fetchImpl(env.GATEWAY_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret: env.GATEWAY_SECRET, action, payload }), signal: controller.signal
-    });
-    const data = await res.json();
-    if (data && data.error === "GATEWAY") throw new Error(data.message || "Gateway error");
-    return data;
-  } finally { clearTimeout(timer); }
+  // Only repeat operations that cannot write registrations, releases or photos.
+  const retryable = new Set(["health", "condo", "ticket", "status", "report", "staff_login", "check_report_passcode"]).has(action);
+  const attempts = retryable ? 2 : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), retryable ? 35000 : 90000);
+    let transient = false;
+    try {
+      let res;
+      try {
+        res = await fetchImpl(env.GATEWAY_URL, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: env.GATEWAY_SECRET, action, payload }), signal: controller.signal
+        });
+      } catch (e) { transient = true; throw e; }
+      if (!res.ok) {
+        transient = res.status === 429 || res.status >= 500;
+        throw new Error("Gateway HTTP " + res.status);
+      }
+      let data;
+      try { data = await res.json(); } catch (e) { transient = true; throw new Error("Gateway returned an invalid response."); }
+      if (!data || typeof data.ok !== "boolean") { transient = true; throw new Error("Gateway returned an invalid response."); }
+      if (data.error === "GATEWAY") throw new Error(data.message || "Gateway error");
+      return data;
+    } catch (e) {
+      if (!transient || attempt + 1 === attempts) throw e;
+    } finally { clearTimeout(timer); }
+  }
 }
 
 /* ---------- signed tokens (HMAC-SHA256) ---------- */
@@ -182,7 +200,7 @@ export async function handleApi(request, env, deps = {}) {
     }
     return json({ ok: false, error: "NOT_FOUND" }, 404);
   } catch (e) {
-    return json({ ok: false, error: "SERVER", message: path === "/api/register" || path === "/api/condo" || path === "/api/my-ticket" ? "The server is unavailable. Please try again." : "Hindi maabot ang server. Subukan ulit. (" + String(e.message || e).slice(0, 120) + ")" }, 502);
+    return json({ ok: false, error: "SERVER", message: path.startsWith("/api/report") || ["/api/register", "/api/condo", "/api/my-ticket"].includes(path) ? "The server connection is temporarily unavailable. Please wait a moment and try again." : "Pansamantalang hindi maabot ang server. Maghintay sandali at subukan ulit." }, 502);
   }
 }
 
