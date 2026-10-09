@@ -5,7 +5,7 @@ Separate from the Barker's app. Own Google Sheet, own Cloudflare Worker. Nothing
 ## How it works
 1. Resident scans the QR poster at the booth -> opens `/?c=RR` (RR = condo code) on their own phone.
 2. Fills in privacy consent, pet details, name, mobile -> gets a **claim ticket** (number + QR + which sample).
-3. BA opens `/ba.html`, scans the ticket (or types the number), takes a photo of the ticket + sample, taps **Sample given**.
+3. BA opens `/ba.html`, takes a photo of the resident’s claim screenshot; the app reads its QR automatically. Ticket-number entry remains a backup. BA confirms the sample, records separate customer-photo consent, takes the customer + sample photo only if consent is YES (furbaby if present), then taps **Sample given**. Declining the customer photo does not prevent claiming.
 4. Client opens `/report.html` with the report passcode.
 
 Rules: one sample per mobile number for the whole activation. Dog: puppy -> Puppy Lamb, small breed -> Small Breed, others -> Maintenance Adult (falls back if out of stock). Cat -> Majesty Adult Salmon. Dog & Cat home -> one of each. BA can change the pack.
@@ -35,3 +35,8 @@ Rules: one sample per mobile number for the whole activation. Dog: puppy -> Pupp
 ## Short links (Cloudflare Pages project `nutrimajesty`, folder `shortlink/`)
 - nutrimajesty.pages.dev/rr → Rainbow Ridge, /lv → La Verti, /ba → BA app, /report → client report.
 - New condo: add a line to `shortlink/_redirects` and push.
+
+## Updating the BA photo flow
+Deploy the updated Worker and assets together. Replace the existing condo Apps Script with `gateway/Code.gs` and update its existing web-app deployment to a new version; keep the same deployment URL and secrets. New photo columns are appended automatically without moving existing records (or run `setupSheets()` to add them beforehand). Refresh the BA app while online to receive the new offline cache.
+
+The ticket photo is stored in the existing PHOTO_URL column. PHOTO_CONSENT is YES / NO; historical/offline saves from the older app are NOT_RECORDED. CUSTOMER_PHOTO_URL stores the separate consented documentation photo and is available in the client report and CSV. Consent is for activation documentation, not advertising. QR decoding runs locally on the still image, not OCR; a screenshot without a readable QR needs a clearer photo or typed ticket number.

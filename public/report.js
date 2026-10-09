@@ -60,9 +60,9 @@
 
     if (data.flags.length) h += "<h2>Claims to check (" + data.flags.length + ")</h2><div class=\"scroll\"><table><tr><th>Ticket</th><th>Result</th><th>BA</th><th>Note</th><th>Photo</th></tr>" + data.flags.map(function (f) { return "<tr><td>" + esc(f.CLAIM_CODE) + "</td><td>" + esc(f.RESULT) + "</td><td>" + esc(f.BA_NAME) + "</td><td>" + esc(f.NOTE) + '</td><td class="photo">' + (f.PHOTO_URL ? '<a href="' + esc(f.PHOTO_URL) + '" target="_blank" rel="noopener">View</a>' : "") + "</td></tr>"; }).join("") + "</table></div>";
 
-    var cols = ["CLAIM_CODE", "REGISTERED_AT", "CONDO_NAME", "RESIDENT_NAME", "MOBILE", "PET_TYPE", "DOG_COUNT", "DOG_NAMES", "DOG_AGE", "DOG_SIZE", "DOG_BRAND", "CAT_COUNT", "CAT_NAMES", "CAT_AGE", "CAT_BRAND", "PROMO_OPT_IN", "STATUS", "SAMPLES_GIVEN", "CLAIMED_AT", "CLAIMED_BY", "PHOTO_URL"];
+    var cols = ["CLAIM_CODE", "REGISTERED_AT", "CONDO_NAME", "RESIDENT_NAME", "MOBILE", "PET_TYPE", "DOG_COUNT", "DOG_NAMES", "DOG_AGE", "DOG_SIZE", "DOG_BRAND", "CAT_COUNT", "CAT_NAMES", "CAT_AGE", "CAT_BRAND", "PROMO_OPT_IN", "STATUS", "SAMPLES_GIVEN", "CLAIMED_AT", "CLAIMED_BY", "PHOTO_URL", "PHOTO_CONSENT", "CUSTOMER_PHOTO_URL"];
     h += "<h2>All registrations (" + regs.length + ")</h2><div class=\"scroll\"><table><tr>" + cols.map(function (c) { return "<th>" + c.replace(/_/g, " ").toLowerCase() + "</th>"; }).join("") + "</tr>" +
-      regs.map(function (r) { return "<tr>" + cols.map(function (c) { return c === "PHOTO_URL" ? '<td class="photo">' + (r[c] ? '<a href="' + esc(r[c]) + '" target="_blank" rel="noopener">View</a>' : "") + "</td>" : "<td>" + esc(r[c]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
+      regs.map(function (r) { return "<tr>" + cols.map(function (c) { return (c === "PHOTO_URL" || c === "CUSTOMER_PHOTO_URL") ? '<td class="photo">' + (r[c] ? '<a href="' + esc(r[c]) + '" target="_blank" rel="noopener">View</a>' : "") + "</td>" : "<td>" + esc(r[c]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
 
     main.innerHTML = h;
     $("day").onchange = function () { filter = this.value; render(); };

@@ -165,11 +165,12 @@ export async function handleApi(request, env, deps = {}) {
     if (path === "/api/redeem" && method === "POST") {
       const b = await body(request);
       if (!b) return json({ ok: false, error: "BAD_REQUEST", message: "Invalid save." }, 400);
-      if (b.photo && String(b.photo).length > MAX_PHOTO_CHARS) return json({ ok: false, error: "PHOTO_TOO_BIG", message: "Masyadong malaki ang photo." }, 413);
+      if ([b.photo, b.customerPhoto].some(photo => photo && String(photo).length > MAX_PHOTO_CHARS)) return json({ ok: false, error: "PHOTO_TOO_BIG", message: "Masyadong malaki ang photo." }, 413);
+      if ((b.customerPhoto && b.photoConsent !== "YES") || (b.photoConsent === "YES" && !b.customerPhoto) || (b.photoConsent != null && !["YES", "NO"].includes(b.photoConsent))) return json({ ok: false, error: "PHOTO_CONSENT", message: "I-check ang consent at customer photo." }, 400);
       return json(await gw("redeem", {
         redemptionId: String(b.redemptionId || "").slice(0, 64), code: String(b.code || "").toUpperCase().slice(0, 20),
         products: Array.isArray(b.products) ? b.products.slice(0, 4).map(String) : [],
-        photo: b.photo || "", phoneSavedAt: String(b.phoneSavedAt || "").slice(0, 40),
+        photo: b.photo || "", photoConsent: b.photoConsent, customerPhoto: b.customerPhoto || "", phoneSavedAt: String(b.phoneSavedAt || "").slice(0, 40),
         staffCode: s.staff.code, staffName: s.staff.name, condoId: s.condo.id
       }));
     }

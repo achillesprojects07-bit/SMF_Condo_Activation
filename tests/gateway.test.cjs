@@ -175,3 +175,32 @@ test("PIN that lost its leading zero in the sheet still works", () => {
   assert.equal(g.call("staff_login", { staffCode: "JA01", pin: "267" }).ok, true);
   assert.equal(g.call("staff_login", { staffCode: "JA01", pin: "0268" }).error, "BAD_PIN");
 });
+
+test("customer documentation photo requires separate consent; declining still claims", () => {
+  const g = fresh(), code = g.call("register", dogReg()).ticket.code;
+  const payload = { redemptionId: "photo-1", code, products: ["NC_SMALL_BREED"], photo: "data:image/jpeg;base64,AAAA", staffCode: "PM01" };
+  assert.equal(g.call("redeem", { ...payload, photoConsent: "NO", customerPhoto: "data:image/jpeg;base64,AAAA" }).error, "PHOTO_CONSENT");
+  assert.equal(g.files.length, 0);
+  assert.equal(g.call("redeem", { ...payload, photoConsent: "YES" }).error, "PHOTO_CONSENT");
+  assert.equal(g.call("redeem", { ...payload, photoConsent: "NO" }).ok, true);
+  assert.equal(g.table("REDEMPTIONS")[0].PHOTO_CONSENT, "NO");
+  assert.equal(g.table("REGISTRATIONS")[0].CUSTOMER_PHOTO_URL, "");
+});
+
+test("separate photos and consent survive an existing-sheet upgrade and a retry", () => {
+  const g = fresh(), code = g.call("register", dogReg()).ticket.code;
+  // Simulate headers from the old deployed sheet, with existing resident data.
+  for (const name of ["REGISTRATIONS", "REDEMPTIONS"]) {
+    const s = g.sheets.get(name), n = s.rows[0].indexOf("PHOTO_CONSENT");
+    s.rows.forEach(row => row.splice(n));
+  }
+  const payload = { redemptionId: "photo-2", code, products: ["NC_SMALL_BREED"], photo: "data:image/jpeg;base64,AAAA", photoConsent: "YES", customerPhoto: "data:image/jpeg;base64,BBBB", staffCode: "PM01" };
+  assert.equal(g.call("redeem", payload).ok, true);
+  const red = g.table("REDEMPTIONS")[0], reg = g.table("REGISTRATIONS")[0];
+  assert.equal(red.PHOTO_CONSENT, "YES");
+  assert.ok(red.CUSTOMER_PHOTO_URL); assert.notEqual(red.CUSTOMER_PHOTO_URL, red.PHOTO_URL);
+  assert.equal(reg.CUSTOMER_PHOTO_URL, red.CUSTOMER_PHOTO_URL);
+  assert.equal(reg.RESIDENT_NAME, "Ana Cruz");
+  assert.equal(g.call("redeem", payload).already, true);
+  assert.equal(g.files.length, 2); assert.equal(g.table("REDEMPTIONS").length, 1);
+});
