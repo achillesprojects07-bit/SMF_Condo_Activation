@@ -168,14 +168,14 @@
   }
 
   async function claimScreen(found) {
-    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false, allowed = (found.samples || []).slice(), oosChoices = {}, eligible = allowed.slice();
+    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false, allowed = (found.samples || []).slice(), oosChoices = {}, eligible = allowed.slice(), photoLoading = false, photoToken = 0, pendingPhoto = "";
     (found.samples || []).forEach(function (id) { chosen[id] = true; });
     main.innerHTML =
       '<div class="card"><div class="cardTitle">Ticket</div><div style="font-size:36px;font-weight:900;letter-spacing:2px">' + esc(code) + '</div><div id="tinfo" class="helper" style="margin-top:4px">Chine-check…</div></div>' +
       '<div id="warn"></div>' +
       '<section class="q" data-q="products"><div class="qTitle">Ibibigay na sample</div><div class="qSub">Naka-check na ang lahat ng para sa ticket. Isang pack bawat applicable variant, kahit ilan ang pets.</div><div class="choices" id="prods" style="grid-template-columns:1fr"></div></section>' +
       '<section class="q" data-q="photo"><div class="qTitle">Photo ng claim screenshot</div><div class="qSub">Kita dapat ang ticket number at QR sa phone ng resident. Kung nakunan na, hindi na kailangang ulitin.</div>' +
-      '<label class="btn secondary" style="text-align:center">📷 Kunan ng picture<input id="cam" type="file" accept="image/*" capture="environment" hidden></label><label class="btn secondary" style="text-align:center">🖼️ Upload from gallery<input id="claimGallery" type="file" accept="image/*" hidden></label><img id="prev" class="photoPrev" hidden alt=""></section>' +
+      '<label class="btn secondary" style="text-align:center">📷 Kunan ng picture<input id="cam" type="file" accept="image/*" capture="environment" hidden></label><label class="btn secondary" style="text-align:center">🖼️ Upload from gallery<input id="claimGallery" type="file" accept="image/*" hidden></label><img id="prev" class="photoPrev" hidden alt=""><div id="claimPhotoMsg" class="helper" role="status"></div><div id="manualPhotoCheck" hidden><label class="lbl" for="photoCode">Hindi mabasa ang QR. I-type ang ticket number na nasa photo.</label><input id="photoCode" class="big" autocapitalize="characters" placeholder="Ticket number sa photo"><button id="confirmPhoto" class="btn secondary" type="button">Confirm ticket number sa photo</button></div></section>' +
       '<section class="q" data-q="consent"><div class="qTitle">Consent para sa customer photo</div><div class="qSub">“Puwede po ba kayong kunan ng photo kasama ang free sample, para sa documentation ng SMF Condo Sampling? Kasama rin po ang furbaby kung nandito. Optional po ito; makukuha ninyo ang sample kahit hindi kayo magpa-photo.”</div><div id="consentChoices" class="choices"><button type="button" class="choice" data-v="YES">Pumayag sa photo</button><button type="button" class="choice" data-v="NO">Hindi pumayag</button></div></section>' +
       '<section class="q" id="customerSection" data-q="customerPhoto" hidden><div class="qTitle">Customer + free sample</div><div class="qSub">Kunan lang pagkatapos pumayag. Kita ang customer at free sample; isama ang furbaby kung present at posible.</div><label class="btn secondary" style="text-align:center">📷 Kunan ang customer + sample<input id="customerCam" type="file" accept="image/*" capture="environment" hidden disabled></label><label class="btn secondary" style="text-align:center">🖼️ Upload from gallery<input id="customerGallery" type="file" accept="image/*" hidden disabled></label><img id="customerPrev" class="photoPrev" hidden alt="Preview ng customer photo"></section>' +
       '<div id="err" class="errbox" hidden></div>' +
@@ -206,7 +206,7 @@
     function paint() {
       var ids = allowed;
       $("prods").innerHTML = ids.map(function (id) { return '<button type="button" class="choice' + (chosen[id] ? " selected" : "") + '" data-v="' + id + '">' + esc(productName(id)) + "</button>"; }).join("");
-      $('give').disabled = blocked || !allowed.length || !Object.keys(chosen).some(function(id){return chosen[id];});
+      $('give').disabled = blocked || photoLoading || !allowed.length || !Object.keys(chosen).some(function(id){return chosen[id];});
       $('oosProds').innerHTML = eligible.map(function(id){return '<button type="button" class="choice'+(oosChoices[id]?' selected':'')+'" data-v="'+id+'">'+esc(productName(id))+'</button>';}).join('');
       main.querySelector('[data-q="products"]').classList.toggle("answered", Object.keys(chosen).some(function (k) { return chosen[k]; }));
       main.querySelector('[data-q="photo"]').classList.toggle("answered", !!photo);
@@ -215,8 +215,31 @@
     $("prods").onclick = function (e) { var b = e.target.closest(".choice"); if (!b) return; chosen[b.dataset.v] = !chosen[b.dataset.v]; paint(); };
     $("cam").onchange = $("claimGallery").onchange = async function () {
       var f = this.files && this.files[0]; if (!f) return;
-      try { photo = await compressPhoto(f); $("prev").src = photo; $("prev").hidden = false; } catch (e) { toast(e.message); }
-      paint();
+      var attempt = ++photoToken, preview = $("prev"), msg = $("claimPhotoMsg");
+      photoLoading = true; photo = ""; pendingPhoto = ""; preview.hidden = true;
+      $("manualPhotoCheck").hidden = true; msg.textContent = "Binabasa at chine-check ang ticket sa photo…"; paint();
+      try {
+        var decoded = await SMFTicketPhoto.read(f);
+        if (attempt !== photoToken || !msg.isConnected) return;
+        if (decoded && decoded.code !== code) throw new Error("Hindi tugma: " + decoded.code + " ang nasa photo, pero " + code + " ang bukas na ticket. Piliin ang tamang photo, o bumalik para buksan ang ticket sa photo.");
+        var compressed = await compressPhoto(f);
+        if (attempt !== photoToken || !msg.isConnected) return;
+        if (!decoded) {
+          pendingPhoto = compressed; preview.src = compressed; preview.hidden = false;
+          $("manualPhotoCheck").hidden = false; $("photoCode").value = "";
+          msg.textContent = "Hindi mabasa ang QR. I-check ang ticket number sa photo bago mag-confirm.";
+        } else {
+          photo = compressed; preview.src = photo; preview.hidden = false; msg.textContent = "Tugma ang photo sa ticket " + code + ".";
+        }
+      } catch (e) { if (attempt === photoToken && msg.isConnected) msg.textContent = e.message; }
+      finally { if (attempt === photoToken && msg.isConnected) { photoLoading = false; this.value = ""; paint(); } }
+    };
+    $("confirmPhoto").onclick = function () {
+      if (!pendingPhoto || photoLoading) return;
+      var entered = $("photoCode").value.trim().toUpperCase();
+      if (entered !== code) { $("claimPhotoMsg").textContent = "Hindi tugma ang ticket number sa bukas na ticket " + code + ". Piliin ang tamang photo o buksan ang tamang ticket."; return; }
+      photo = pendingPhoto; pendingPhoto = ""; $("manualPhotoCheck").hidden = true;
+      $("claimPhotoMsg").textContent = "Ticket number sa photo manually confirmed: " + code + "."; paint();
     };
     paint();
 
@@ -270,6 +293,7 @@
       var ids = Object.keys(chosen).filter(function (k) { return chosen[k]; }), err = $("err");
       if (blocked) { err.hidden = false; err.textContent = "Hindi pwedeng i-claim ang ticket na ito."; return; }
       if (!ids.length) { err.hidden = false; err.textContent = "Pumili ng sample na ibinigay."; main.querySelector('[data-q="products"]').classList.add("bad"); return; }
+      if (photoLoading) { err.hidden = false; err.textContent = "Hintayin munang matapos ang pag-check ng photo."; return; }
       if (!photo) { err.hidden = false; err.textContent = "Kunan o i-upload muna ang photo ng claim screenshot."; main.querySelector('[data-q="photo"]').classList.add("bad"); return; }
       if (!photoConsent) { err.hidden = false; err.textContent = "Itala muna kung pumayag o hindi pumayag sa customer photo."; return; }
       if (photoConsent === "YES" && !customerPhoto) { err.hidden = false; err.textContent = "Kunan o i-upload muna ang customer photo kasama ang free sample."; return; }
