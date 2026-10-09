@@ -62,7 +62,7 @@
     h+='<nav class="report-tabs" aria-label="Dashboard sections">'+[['overview','Overview'],['samples','Samples & stock'],['residents','Resident profiles'],['records','Records & photos']].map(function(t){return '<button type="button" data-view="'+t[0]+'" aria-current="'+(view===t[0]?'page':'false')+'" class="tab '+(view===t[0]?'active':'')+'">'+t[1]+'</button>';}).join('')+'</nav>';
     if(view==='overview') {
       h+='<div class="metrics">'+kpi(regs.length,'Households registered','One registration per mobile number','navy')+kpi(claimed.length,'Households served','Already received their free sample','aqua')+kpi(given,'Sample packs distributed','Counts packs, not households','coral')+kpi(waiting,'Awaiting collection','Registered with a sample available','gold')+'</div>';
-      h+='<p class="definition">A household with both a dog and a cat may receive two packs. This is why packs distributed can exceed households served.</p>';
+      h+='<p class="definition">Each household receives one pack per applicable variant, regardless of pet count. A household with puppies, adult dogs and cats may receive three packs. This is why packs distributed can exceed households served.</p>';
       if(!regs.length)h+=empty('No live resident registrations yet','Totals are zero because no live registrations match these filters. Scheduled sample allocations are shown in Samples & stock.');
       var byCondo={};days.forEach(function(d){if(!byCondo[d.condoId])byCondo[d.condoId]={name:d.condoName,registered:0,claimed:0};});
       regs.forEach(function(r){var x=byCondo[r.CONDO_ID]||(byCondo[r.CONDO_ID]={name:r.CONDO_NAME,registered:0,claimed:0});x.registered++;if(r.STATUS==='CLAIMED')x.claimed++;});

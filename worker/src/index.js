@@ -191,7 +191,6 @@ function clean(x) {
     age: String(x.age || "").toUpperCase().slice(0, 10),
     size: String(x.size || "").toUpperCase().slice(0, 10),
     brand: String(x.brand || "").trim().slice(0, 60),
-    sampleIndex: Number.isInteger(x.sampleIndex) ? x.sampleIndex : 0,
     profiles: Array.isArray(x.profiles) ? x.profiles.slice(0,30).map(p => ({name:String(p.name||'').trim().slice(0,60),age:String(p.age||'').toUpperCase().slice(0,10),size:String(p.size||'').toUpperCase().slice(0,10),brand:String(p.brand||'').trim().slice(0,100),reason:String(p.reason||'').trim().slice(0,200)})) : undefined
   };
 }

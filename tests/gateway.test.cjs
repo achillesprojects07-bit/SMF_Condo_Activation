@@ -81,13 +81,13 @@ test("ticket numbers are per condo", () => {
   assert.equal(g.call("register", dogReg({ mobile: "09180000002" })).ticket.code, "RR-0002");
 });
 
-test("when puppy packs run out, a puppy gets the next best pack; when all run out, NO_STOCK", () => {
+test("when puppy packs run out, no ineligible adult variant is substituted", () => {
   const g = fresh();
   const stock = g.sheets.get("STOCK").rows;
   for (const r of stock) if (r[1] === "RR") r[3] = r[2] === "NC_PUPPY_LAMB" ? 1 : r[2] === "NC_SMALL_BREED" ? 1 : r[2] === "NC_MAINT_ADULT" ? 0 : 0;
   const puppy = { names: "P", age: "PUPPY", size: "MEDIUM", brand: "Pedigree" };
   assert.deepEqual(g.call("register", dogReg({ mobile: "09170000011", dog: puppy })).ticket.samples.map(s => s.id), ["NC_PUPPY_LAMB"]);
-  assert.deepEqual(g.call("register", dogReg({ mobile: "09170000012", dog: puppy })).ticket.samples.map(s => s.id), ["NC_SMALL_BREED"]);
+  assert.deepEqual(g.call("register", dogReg({ mobile: "09170000012", dog: puppy })).ticket.samples.map(s => s.id), []);
   const none = g.call("register", dogReg({ mobile: "09170000013", dog: puppy }));
   assert.equal(none.ok, true); assert.equal(none.ticket.samples.length, 0); assert.equal(none.ticket.noStock, true);
   assert.equal(g.table("REGISTRATIONS")[2].STATUS, "NO_STOCK");
@@ -257,19 +257,51 @@ test('mixed puppy/adult and kitten/adult profiles keep separate brands and reaso
   const dogProfiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',reason:'Pet likes it'}];
   const catProfiles=[{name:'Kit',age:'KITTEN',brand:'Whiskas',reason:'Easy to find'},{name:'Ming',age:'ADULT',brand:'Cuties',reason:'Recommended by vet'}];
   const r=g.call('register',dogReg({petType:'BOTH',dog:{count:99,profiles:dogProfiles,sampleIndex:1},cat:{profiles:catProfiles}}));
-  assert.equal(r.ok,true);assert.deepEqual(r.ticket.samples.map(s=>s.id),['NC_MAINT_ADULT','MJ_ADULT_SALMON']);
+  assert.equal(r.ok,true);assert.deepEqual(r.ticket.samples.map(s=>s.id),['NC_PUPPY_LAMB','NC_MAINT_ADULT','MJ_ADULT_SALMON']);
   const row=g.table('REGISTRATIONS')[0];assert.equal(row.DOG_COUNT,2);assert.equal(row.CAT_COUNT,2);
   assert.deepEqual(JSON.parse(row.DOG_PROFILES),dogProfiles);assert.deepEqual(JSON.parse(row.CAT_PROFILES),catProfiles);
   assert.match(row.DOG_BRAND_REASON,/Price/);assert.match(row.CAT_BRAND_REASON,/vet/);
   assert.equal(row.DOG_AGE,'PUPPY, ADULT');assert.equal(row.CAT_AGE,'KITTEN, ADULT');
-  assert.equal(r.ticket.samples.length,2,'recording four pets does not multiply sample allowance');
+  assert.equal(r.ticket.samples.length,3,'each applicable variant is assigned once');
   const second=g.call('register',dogReg({mobile:'09170000999',dog:{profiles:dogProfiles,sampleIndex:0}}));
-  assert.deepEqual(second.ticket.samples.map(s=>s.id),['NC_PUPPY_LAMB']);
+  assert.deepEqual(second.ticket.samples.map(s=>s.id),['NC_PUPPY_LAMB','NC_MAINT_ADULT']);
 });
 
-test('new pet profiles require every age, dog size, brand and reason; invalid sample target rejected',()=>{
+test('new pet profiles require every age, dog size, brand and reason',()=>{
  const g=fresh();const profile={name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Pet likes it'};
  for(const key of ['name','age','size','brand','reason'])assert.equal(g.call('register',dogReg({dog:{profiles:[{...profile,[key]:''}]}})).error,'BAD_PET_DETAILS',key);
- assert.equal(g.call('register',dogReg({dog:{profiles:[profile],sampleIndex:2}})).error,'BAD_PET_DETAILS');
  assert.equal(g.table('REGISTRATIONS').length,0);
+});
+
+
+test('three puppies, three adult dogs and three cats reserve and release only three packs', () => {
+ const g=fresh();
+ const profile=(name,age,size)=>({name,age,size,brand:'Other',reason:'Pet likes it'});
+ const dogs=[...Array.from({length:3},(_,i)=>profile('Pup '+i,'PUPPY','SMALL')),...Array.from({length:3},(_,i)=>profile('Dog '+i,'ADULT','LARGE'))];
+ const cats=Array.from({length:3},(_,i)=>profile('Cat '+i,'ADULT',''));
+ const t=g.call('register',dogReg({petType:'BOTH',dog:{profiles:dogs},cat:{profiles:cats}})).ticket;
+ const ids=['NC_PUPPY_LAMB','NC_MAINT_ADULT','MJ_ADULT_SALMON'];
+ assert.deepEqual(t.samples.map(s=>s.id),ids);
+ const reserved=g.ctx.stockFor_('RR','2026-10-10');
+ for(const id of ids)assert.equal(reserved[id].reserved,1);
+ assert.equal(reserved.NC_SMALL_BREED.reserved,0);
+ assert.equal(g.call('redeem',{redemptionId:'bad-variant',code:t.code,staffCode:'PM01',products:['NC_SMALL_BREED']}).error,'UNASSIGNED_PRODUCT');
+ assert.equal(g.table('REDEMPTIONS').length,0);
+ const redemption={redemptionId:'three-packs',code:t.code,staffCode:'PM01',condoId:'RR',products:[...ids,...ids]};
+ assert.equal(g.call('redeem',redemption).ok,true);
+ assert.equal(g.call('redeem',redemption).already,true);
+ assert.equal(g.table('REGISTRATIONS')[0].SAMPLES_GIVEN,ids.join(', '));
+ const after=g.ctx.stockFor_('RR','2026-10-10');
+ for(const id of ids){assert.equal(after[id].given,1);assert.equal(after[id].reserved,0);}
+ assert.equal(g.table('REDEMPTIONS').length,1);
+});
+
+test('small and large adult dogs receive their distinct variants once; partial stock-out is flagged',()=>{
+ const g=fresh();const dog=(age,size)=>({name:'Pet',age,size,brand:'Pedigree',reason:'Price / budget'});
+ const profiles=[dog('PUPPY','SMALL'),dog('ADULT','SMALL'),dog('ADULT','LARGE'),dog('ADULT','MEDIUM')];
+ const t=g.call('register',dogReg({petType:'BOTH',dog:{profiles},cat:{profiles:[{name:'Cat',age:'ADULT',brand:'Whiskas',reason:'Pet likes it'}]}})).ticket;
+ assert.equal(t.samples.length,4);assert.equal(new Set(t.samples.map(s=>s.id)).size,4);
+ const g2=fresh();for(const r of g2.sheets.get('STOCK').rows)if(r[1]==='RR'&&r[2]==='NC_PUPPY_LAMB')r[3]=0;
+ const partial=g2.call('register',dogReg({dog:{profiles}})).ticket;
+ assert.deepEqual(partial.samples.map(s=>s.id),['NC_SMALL_BREED','NC_MAINT_ADULT']);assert.equal(partial.noStock,true);
 });

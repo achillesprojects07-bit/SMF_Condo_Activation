@@ -1,6 +1,6 @@
 # SMF Condo Activation (NutriChunks / Majesty condo sampling)
 
-Separate from the Barker's app. Own Google Sheet, own  Cloudflare Worker. Nothing here touches the Barker's sheet or Worker.
+Separate from the Barker's app. Own Google Sheet, own Cloudflare Worker. Nothing here touches the Barker's sheet or Worker.
 
 ## How it works
 1. Resident scans the QR poster at the booth -> opens `/?c=RR` (RR = condo code) on their own phone.
@@ -8,7 +8,7 @@ Separate from the Barker's app. Own Google Sheet, own  Cloudflare Worker. Nothin
 3. BA opens `/ba.html`, takes a photo of the resident’s claim screenshot; the app reads its QR automatically. Ticket-number entry remains a backup. BA confirms the sample, records separate customer-photo consent, takes the customer + sample photo only if consent is YES (furbaby if present), then taps **Sample given**. Declining the customer photo does not prevent claiming.
 4. Client opens `/report.html` with the report passcode.
 
-Rules: one sample per mobile number for the whole activation. Dog: puppy -> Puppy Lamb, small breed -> Small Breed, others -> Maintenance Adult (falls back if out of stock). Cat -> Majesty Adult Salmon. Dog & Cat home -> one of each. BA can change the pack.
+Rules: one registration per mobile number for the whole activation, with one pack per applicable variant regardless of pet count. Puppy -> Puppy Lamb; adult small dog -> Small Breed; adult medium/large dog -> Maintenance Adult; cat -> Majesty Adult Salmon. All eligible variants appear on the ticket once. An unavailable variant is marked out of stock; there is no substitution. BA releases only assigned variants. Existing tickets keep their original allocation.
 
 ## Google Sheet tabs (edit these, not the code)
 | Tab | What to put |

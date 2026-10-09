@@ -6,7 +6,7 @@
   var TICKET_KEY = "smfc_ticket_v1";
   var state = { consent: "", petType: "", dogCount: 1, catCount: 1, dogAge: "", dogSize: "", dogBrand: "", catAge: "", catBrand: "", promo: "" };
   var info = null;
-  var profiles = {dog: [], cat: []}, sampleDogIndex = 0;
+  var profiles = {dog: [], cat: []};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -88,13 +88,12 @@
   function options(list, selected) { return '<option value="">Choose an answer</option>' + list.map(function(x){var v=Array.isArray(x)?x[0]:x, label=Array.isArray(x)?x[1]:x;return '<option value="'+esc(v)+'"'+(v===selected?' selected':'')+'>'+esc(label)+'</option>';}).join(''); }
   function renderPets(pet) {
     var n=state[pet+'Count']; while(profiles[pet].length<n) profiles[pet].push(petBlank());
-    profiles[pet].length=n; if(sampleDogIndex>=profiles.dog.length)sampleDogIndex=0;
+    profiles[pet].length=n;
     $(pet+'Profiles').innerHTML=profiles[pet].map(function(p,i){
       var key=pet+'Profile'+i, brands=(info.brands||[]).filter(function(b){return b.petType===pet.toUpperCase()||b.petType==='BOTH';}).map(function(b){return b.brand;});
       function field(k,label,list) {return '<label style="display:block;margin:14px 0">'+label+(list?'<select class="big" data-pet="'+pet+'" data-index="'+i+'" data-field="'+k+'">'+options(list,p[k])+'</select>':'<input class="big" maxlength="60" data-pet="'+pet+'" data-index="'+i+'" data-field="'+k+'" value="'+esc(p[k])+'">')+'</label>';}
       return '<section class="q" data-q="'+key+'"><div class="qTitle">'+(pet==='dog'?'Dog':'Cat')+' '+(i+1)+'</div>'+field('name',"Pet's name")+field('age','Age',pet==='dog'?[['PUPPY','Puppy (below 1 yr)'],['ADULT','Adult (1 yr+)']]:[['KITTEN','Kitten (below 1 yr)'],['ADULT','Adult (1 yr+)']])+(pet==='dog'?field('size','Size',[['SMALL','Small'],['MEDIUM','Medium'],['LARGE','Large']]):'')+field('brand','Current '+pet+' food brand',brands)+ '<div data-extra="brand"'+(!isOther(p.brand)?' hidden':'')+'>'+field('brandOther','Other brand name')+'</div>'+field('reason','Why do you use this food for this '+pet+'?',['Pet likes it','Price / budget','Recommended by vet','Recommended by family / friends','Easy to find','Nutrition / health needs','Used to this food','Other'])+'<div data-extra="reason"'+(p.reason!=='Other'?' hidden':'')+'>'+field('reasonOther','Other reason')+'</div></section>';
     }).join('');
-    if(pet==='dog'&&n>1) $(pet+'Profiles').innerHTML+='<section class="q"><div class="qTitle">Which dog will receive the free dog sample?</div><div class="qSub">One dog sample per registration. All dogs are recorded separately.</div><select class="big" id="sampleDogIndex">'+profiles.dog.map(function(p,i){return '<option value="'+i+'"'+(sampleDogIndex===i?' selected':'')+'>Dog '+(i+1)+'</option>';}).join('')+'</select></section>';
   }
   function answered() {
     var a={consent:state.consent==='YES',petType:!!state.petType,name:$('name').value.trim().length>=2,mobile:/^09\d{9}$/.test(normMobile($('mobile').value)),promo:!!state.promo,dogCount:true,catCount:true};
@@ -116,7 +115,6 @@
     renderPets('dog');renderPets('cat');
     function profileInput(e) {
       var t=e.target;
-      if(t.id==='sampleDogIndex'){sampleDogIndex=Number(t.value);return;}
       if(!t.dataset.pet)return;
       var p=profiles[t.dataset.pet][Number(t.dataset.index)];p[t.dataset.field]=t.value;
       var card=t.closest('.q');card.querySelector('[data-extra="brand"]').hidden=!isOther(p.brand);card.querySelector('[data-extra="reason"]').hidden=p.reason!=='Other';refresh();
@@ -157,7 +155,7 @@
     btn.disabled = true; btn.textContent = "Saving…";
     function petPayload(pet) {
       var list=profiles[pet].map(function(p){return {name:p.name.trim(),age:p.age,size:pet==='dog'?p.size:'',brand:isOther(p.brand)?'Other: '+p.brandOther.trim():p.brand,reason:p.reason==='Other'?'Other: '+p.reasonOther.trim():p.reason};});
-      return {profiles:list,count:list.length,sampleIndex:pet==='dog'?sampleDogIndex:0};
+      return {profiles:list,count:list.length};
     }
     var regId = uuid();
     var payload = {

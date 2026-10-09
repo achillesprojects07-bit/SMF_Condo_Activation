@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.1-training-exclusion';
+var VERSION = '1.3-one-pack-per-variant';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -23,7 +23,7 @@ var TABLES = {
     'CONSENT', 'PROMO_OPT_IN', 'RESIDENT_NAME', 'MOBILE', 'PET_TYPE',
     'DOG_COUNT', 'DOG_NAMES', 'DOG_AGE', 'DOG_SIZE', 'DOG_BRAND',
     'CAT_COUNT', 'CAT_NAMES', 'CAT_AGE', 'CAT_BRAND',
-    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE', 'DOG_PROFILES', 'CAT_PROFILES', 'DOG_BRAND_REASON', 'CAT_BRAND_REASON'],
+    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE', 'DOG_PROFILES', 'CAT_PROFILES', 'DOG_BRAND_REASON', 'CAT_BRAND_REASON', 'SAMPLE_PRODUCTS', 'UNAVAILABLE_SAMPLES'],
   REDEMPTIONS: ['REDEMPTION_ID', 'CLAIM_CODE', 'DATE', 'CONDO_ID', 'STAFF_CODE', 'BA_NAME',
     'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID', 'DATA_TYPE']
 };
@@ -212,7 +212,7 @@ function stockFor_(condoId, date, regs) {
     if (r.STATUS === 'CLAIMED') {
       String(r.SAMPLES_GIVEN || '').split(',').forEach(function (id) { id = id.trim(); if (out[id]) out[id].given++; });
     } else if (r.STATUS === 'WAITING') {
-      [r.SAMPLE_DOG, r.SAMPLE_CAT].forEach(function (id) { if (out[id]) out[id].reserved++; });
+      assignedSamples_(r).forEach(function (id) { if (out[id]) out[id].reserved++; });
     }
   });
   Object.keys(out).forEach(function (k) {
@@ -221,20 +221,6 @@ function stockFor_(condoId, date, regs) {
     x.free = x.allocated - x.given - x.reserved;
   });
   return out;
-}
-
-/** Puppy -> Puppy Lamb, small breed -> Small Breed, everyone else -> Maintenance Adult. Falls back if that pack has run out. */
-function pickDog_(age, size, stock) {
-  var order;
-  if (age === 'PUPPY') order = ['NC_PUPPY_LAMB', 'NC_SMALL_BREED', 'NC_MAINT_ADULT'];
-  else if (size === 'SMALL') order = ['NC_SMALL_BREED', 'NC_MAINT_ADULT', 'NC_PUPPY_LAMB'];
-  else order = ['NC_MAINT_ADULT', 'NC_SMALL_BREED', 'NC_PUPPY_LAMB'];
-  for (var i = 0; i < order.length; i++) if (stock[order[i]] && stock[order[i]].free > 0) return order[i];
-  return 'NONE';
-}
-
-function pickCat_(stock) {
-  return stock.MJ_ADULT_SALMON && stock.MJ_ADULT_SALMON.free > 0 ? 'MJ_ADULT_SALMON' : 'NONE';
 }
 
 function nextClaimCode_(condo, regs) {
@@ -265,10 +251,8 @@ function normalizePet_(pet, kind) {
   if (!Array.isArray(pet.profiles)) return pet;
   var list=pet.profiles;
   if (!list.length || list.length>30 || list.some(function(x){return !x || !String(x.name||'').trim() || (kind==='DOG'?['PUPPY','ADULT']:['KITTEN','ADULT']).indexOf(x.age)<0 || (kind==='DOG'&&['SMALL','MEDIUM','LARGE'].indexOf(x.size)<0) || !String(x.brand||'').trim() || !String(x.reason||'').trim();})) return null;
-  var index=pet.sampleIndex===undefined?0:Number(pet.sampleIndex);
-  if(index%1!==0||index<0||index>=list.length)return null;
   function unique(k){return list.map(function(x){return String(x[k]||'');}).filter(function(x,i,a){return a.indexOf(x)===i;}).join(', ');}
-  return {profiles:list,count:list.length,names:list.map(function(x){return x.name;}).join(', '),age:unique('age'),size:unique('size'),brand:unique('brand'),reason:unique('reason'),sampleAge:list[index].age,sampleSize:list[index].size};
+  return {profiles:list,count:list.length,names:list.map(function(x){return x.name;}).join(', '),age:unique('age'),size:unique('size'),brand:unique('brand'),reason:unique('reason')};
 }
 
 function register_(p) {
@@ -284,7 +268,7 @@ function register_(p) {
   var regs = read_('REGISTRATIONS');
   for (var i = 0; i < regs.length; i++) {
     if (normMobile_(regs[i].MOBILE) === mobile && trainingRow_(regs[i]) === trainingCondo_(condo.CONDO_ID)) {
-      return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one free pack is allowed per mobile number.' };
+      return { ok: false, error: 'ALREADY_REGISTERED', message: 'This mobile number is already registered. Only one registration is allowed per mobile number, with one pack per applicable variant.' };
     }
   }
 
@@ -295,9 +279,17 @@ function register_(p) {
   if(!dog||!cat)return {ok:false,error:'BAD_PET_DETAILS',message:'Please complete the name, age, current food brand and reason for every pet, plus size for every dog.'};
 
   var stock = stockFor_(condo.CONDO_ID, date, regs);
-  var sampleDog = hasDog ? pickDog_(String(dog.sampleAge || dog.age || '').toUpperCase(), String(dog.sampleSize || dog.size || '').toUpperCase(), stock) : '';
-  var sampleCat = hasCat ? pickCat_(stock) : '';
-  var gotSome = (sampleDog && sampleDog !== 'NONE') || (sampleCat && sampleCat !== 'NONE');
+  var eligible = [];
+  function addVariant(id) { if (eligible.indexOf(id) < 0) eligible.push(id); }
+  if (hasDog) (dog.profiles || [dog]).forEach(function (x) {
+    addVariant(String(x.age || '').toUpperCase() === 'PUPPY' ? 'NC_PUPPY_LAMB' : String(x.size || '').toUpperCase() === 'SMALL' ? 'NC_SMALL_BREED' : 'NC_MAINT_ADULT');
+  });
+  if (hasCat) addVariant('MJ_ADULT_SALMON');
+  var samples = eligible.filter(function (id) { return stock[id] && stock[id].free > 0; });
+  var unavailable = eligible.filter(function (id) { return samples.indexOf(id) < 0; });
+  var sampleDog = samples.filter(function (id) { return /^NC_/.test(id); })[0] || (hasDog ? 'NONE' : '');
+  var sampleCat = samples.indexOf('MJ_ADULT_SALMON') >= 0 ? 'MJ_ADULT_SALMON' : (hasCat ? 'NONE' : '');
+  var gotSome = samples.length > 0;
 
   var code = nextClaimCode_(condo, regs);
   var row = {
@@ -309,23 +301,29 @@ function register_(p) {
     CAT_COUNT: hasCat ? Number(cat.count) || 1 : '', CAT_NAMES: hasCat ? String(cat.names || '').slice(0, 2000) : '',
     CAT_AGE: hasCat ? String(cat.age || '') : '', CAT_BRAND: hasCat ? String(cat.brand || '').slice(0, 3000) : '',
     DOG_PROFILES: hasDog && dog.profiles ? JSON.stringify(dog.profiles) : '', CAT_PROFILES: hasCat && cat.profiles ? JSON.stringify(cat.profiles) : '', DOG_BRAND_REASON: hasDog ? String(dog.reason||'') : '', CAT_BRAND_REASON: hasCat ? String(cat.reason||'') : '',
-    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, STATUS: gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
+    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, SAMPLE_PRODUCTS: samples.join(', '), UNAVAILABLE_SAMPLES: unavailable.join(', '), STATUS: gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
   };
   append_('REGISTRATIONS', row);
   return { ok: true, ticket: ticketView_(row, condo) };
 }
 
+// New tickets hold every reserved variant. Older tickets retain their original allocation.
+function assignedSamples_(r) {
+  var ids = r.SAMPLE_PRODUCTS ? String(r.SAMPLE_PRODUCTS).split(',').map(function (id) { return id.trim(); }) : [r.SAMPLE_DOG, r.SAMPLE_CAT];
+  return ids.filter(function (id, i, all) { return id && id !== 'NONE' && all.indexOf(id) === i; });
+}
+
 function ticketView_(r, condo) {
   var names = {};
   products_().forEach(function (x) { names[x.PRODUCT_ID] = x.PRODUCT_NAME; });
-  var samples = [r.SAMPLE_DOG, r.SAMPLE_CAT].filter(function (x) { return x && x !== 'NONE'; });
+  var samples = assignedSamples_(r);
   return {
     code: r.CLAIM_CODE, date: r.DATE, registeredAt: r.REGISTERED_AT, status: r.STATUS,
     condoId: r.CONDO_ID, condoName: (condo && condo.CONDO_NAME) || r.CONDO_NAME,
     name: r.RESIDENT_NAME, petType: r.PET_TYPE,
     petNames: [r.DOG_NAMES, r.CAT_NAMES].filter(String).join(', '),
     samples: samples.map(function (id) { return { id: id, name: names[id] || id }; }),
-    noStock: [r.SAMPLE_DOG, r.SAMPLE_CAT].indexOf('NONE') >= 0,
+    noStock: !!r.UNAVAILABLE_SAMPLES || [r.SAMPLE_DOG, r.SAMPLE_CAT].indexOf('NONE') >= 0,
     claimedAt: r.CLAIMED_AT || '', claimedBy: r.CLAIMED_BY || ''
   };
 }
@@ -382,7 +380,8 @@ function redeem_(p) {
   if (reg && trainingStaff_(p.staffCode) !== trainingRow_(reg)) return { ok: false, error: 'WRONG_ASSIGNMENT', message: 'Gamitin ang ticket para sa iyong assigned condo. Training accounts use TRAIN tickets.' };
   var products = {};
   products_().forEach(function (x) { products[x.PRODUCT_ID] = x; });
-  var given = (p.products || []).filter(function (id) { return products[id]; });
+  var given = (p.products || []).filter(function (id, i, all) { return products[id] && all.indexOf(id) === i; });
+  if (reg && given.some(function (id) { return assignedSamples_(reg).indexOf(id) < 0; })) return { ok: false, error: 'UNASSIGNED_PRODUCT', message: 'Ibigay lang ang naka-assign sa ticket: isang pack bawat applicable variant.' };
   var result = 'OK', note = '';
   if (!reg) { result = 'UNKNOWN_CODE'; note = 'Ticket number not found'; }
   else if (reg.STATUS === 'CLAIMED') { result = 'DUPLICATE'; note = 'Already claimed ' + reg.CLAIMED_AT + ' by ' + reg.CLAIMED_BY; }

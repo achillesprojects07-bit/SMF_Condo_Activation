@@ -167,12 +167,12 @@
   }
 
   async function claimScreen(found) {
-    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false;
+    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false, allowed = (found.samples || []).slice();
     (found.samples || []).forEach(function (id) { chosen[id] = true; });
     main.innerHTML =
       '<div class="card"><div class="cardTitle">Ticket</div><div style="font-size:36px;font-weight:900;letter-spacing:2px">' + esc(code) + '</div><div id="tinfo" class="helper" style="margin-top:4px">Chine-check…</div></div>' +
       '<div id="warn"></div>' +
-      '<section class="q" data-q="products"><div class="qTitle">Ibibigay na sample</div><div class="qSub">Naka-check na ang para sa ticket. Palitan lang kung kailangan.</div><div class="choices" id="prods" style="grid-template-columns:1fr"></div></section>' +
+      '<section class="q" data-q="products"><div class="qTitle">Ibibigay na sample</div><div class="qSub">Naka-check na ang lahat ng para sa ticket. Isang pack bawat applicable variant, kahit ilan ang pets.</div><div class="choices" id="prods" style="grid-template-columns:1fr"></div></section>' +
       '<section class="q" data-q="photo"><div class="qTitle">Photo ng claim screenshot</div><div class="qSub">Kita dapat ang ticket number at QR sa phone ng resident. Kung nakunan na, hindi na kailangang ulitin.</div>' +
       '<label class="btn secondary" style="text-align:center">📷 Kunan ng picture<input id="cam" type="file" accept="image/*" capture="environment" hidden></label><img id="prev" class="photoPrev" hidden alt=""></section>' +
       '<section class="q" data-q="consent"><div class="qTitle">Consent para sa customer photo</div><div class="qSub">“Puwede po ba kayong kunan ng photo kasama ang free sample, para sa documentation ng SMF Condo Sampling? Kasama rin po ang furbaby kung nandito. Optional po ito; makukuha ninyo ang sample kahit hindi kayo magpa-photo.”</div><div id="consentChoices" class="choices"><button type="button" class="choice" data-v="YES">Pumayag sa photo</button><button type="button" class="choice" data-v="NO">Hindi pumayag</button></div></section>' +
@@ -202,7 +202,7 @@
     };
 
     function paint() {
-      var ids = Object.keys(PRODUCT_NAMES);
+      var ids = allowed;
       $("prods").innerHTML = ids.map(function (id) { return '<button type="button" class="choice' + (chosen[id] ? " selected" : "") + '" data-v="' + id + '">' + esc(productName(id)) + "</button>"; }).join("");
       main.querySelector('[data-q="products"]').classList.toggle("answered", Object.keys(chosen).some(function (k) { return chosen[k]; }));
       main.querySelector('[data-q="photo"]').classList.toggle("answered", !!photo);
@@ -233,7 +233,7 @@
         } else if (t.condoId && t.condoId !== session.condo.id) {
           $("warn").innerHTML = '<div class="warnbox">Ang ticket na ito ay galing sa ' + esc(t.condoName) + ". Siguraduhin bago ibigay.</div>";
         }
-        if (!found.samples || !found.samples.length) { chosen = {}; (t.samples || []).forEach(function (s) { chosen[s.id] = true; }); paint(); }
+        allowed = (t.samples || []).map(function (s) { return s.id; }); chosen = {}; allowed.forEach(function (id) { chosen[id] = true; }); paint();
         if (t.noStock && !(t.samples || []).length) $("warn").innerHTML += '<div class="warnbox">Walang sample na naka-assign (ubos ang stock nung nag-register).</div>';
       }
       if (blocked) {
