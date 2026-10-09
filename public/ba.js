@@ -80,7 +80,7 @@
     main.innerHTML =
       (session.testMode ? '<div class="warnbox" style="margin:0 0 12px">PRACTICE MODE (TEST_MODE = YES sa sheet)</div>' : "") +
       '<div id="queueNote" class="queueNote" hidden></div>' +
-      '<button id="scan" class="btn primary huge" type="button" style="margin-top:0">📷 Kunan ang claim screenshot</button>' +
+      '<button id="scan" class="btn primary huge" type="button" style="margin-top:0">📷 Kunan o i-upload ang claim screenshot</button>' +
       '<div class="card" style="margin-top:12px"><div class="cardTitle">O i-type ang ticket number</div><div class="codeRow"><input id="typed" class="big" placeholder="RR-0001" autocapitalize="characters" autocomplete="off"><button id="find" class="btn dark" type="button">Hanapin</button></div></div>' +
       '<div class="card"><div class="cardTitle">Ngayong araw • ' + esc(session.condo.name) + '</div><div class="stats"><div class="stat"><b id="sReg">–</b><span>Registered</span></div><div class="stat"><b id="sClaim">–</b><span>Na-claim</span></div><div class="stat"><b id="sWait">–</b><span>Naghihintay</span></div></div></div>' +
       '<div class="card"><div class="cardTitle">Natitirang sample (stock left)</div><div id="stock"><div class="helper">Loading…</div></div></div>' +
@@ -132,13 +132,14 @@
 
   function ticketPhotoScreen() {
     stopCamera();
-    main.innerHTML = '<div class="hero"><div class="heroTitle">Photo ng claim screenshot</div><div class="heroSub">Kunan ang claim screenshot sa phone ng resident. Isama ang buong QR code, malinaw at walang glare. Automatic babasahin ng app ang ticket.</div></div>' +
+    main.innerHTML = '<div class="hero"><div class="heroTitle">Photo ng claim screenshot</div><div class="heroSub">Kunan ang claim screenshot sa phone ng resident, o i-upload mula sa gallery. Isama ang buong QR code, malinaw at walang glare. Automatic babasahin ng app ang ticket.</div></div>' +
       '<label class="btn primary huge" style="text-align:center">📷 Kunan ng photo<input id="ticketCam" type="file" accept="image/*" capture="environment" hidden></label>' +
+      '<label class="btn secondary huge" style="text-align:center">🖼️ Upload from gallery<input id="ticketGallery" type="file" accept="image/*" hidden></label>' +
       '<div id="photoMsg" class="helper center" role="status"></div><button id="cancel" class="btn secondary" type="button">Bumalik</button>';
     $("cancel").onclick = home;
-    $("ticketCam").onchange = async function () {
+    $("ticketCam").onchange = $("ticketGallery").onchange = async function () {
       var file = this.files && this.files[0]; if (!file) return;
-      this.disabled = true;
+      $("ticketCam").disabled = $("ticketGallery").disabled = true;
       var msg = $("photoMsg"); msg.textContent = "Binabasa ang ticket…";
       try {
         var found = await SMFTicketPhoto.read(file);
@@ -146,7 +147,7 @@
         found.ticketPhoto = await compressPhoto(file);
         if (!msg.isConnected) return;
         claimScreen(found);
-      } catch (e) { if (msg.isConnected) { msg.textContent = e.message; $("ticketCam").disabled = false; $("ticketCam").value = ""; } }
+      } catch (e) { if (msg.isConnected) { msg.textContent = e.message; $("ticketCam").disabled = $("ticketGallery").disabled = false; $("ticketCam").value = $("ticketGallery").value = ""; } }
     };
   }
 
@@ -174,9 +175,9 @@
       '<div id="warn"></div>' +
       '<section class="q" data-q="products"><div class="qTitle">Ibibigay na sample</div><div class="qSub">Naka-check na ang lahat ng para sa ticket. Isang pack bawat applicable variant, kahit ilan ang pets.</div><div class="choices" id="prods" style="grid-template-columns:1fr"></div></section>' +
       '<section class="q" data-q="photo"><div class="qTitle">Photo ng claim screenshot</div><div class="qSub">Kita dapat ang ticket number at QR sa phone ng resident. Kung nakunan na, hindi na kailangang ulitin.</div>' +
-      '<label class="btn secondary" style="text-align:center">📷 Kunan ng picture<input id="cam" type="file" accept="image/*" capture="environment" hidden></label><img id="prev" class="photoPrev" hidden alt=""></section>' +
+      '<label class="btn secondary" style="text-align:center">📷 Kunan ng picture<input id="cam" type="file" accept="image/*" capture="environment" hidden></label><label class="btn secondary" style="text-align:center">🖼️ Upload from gallery<input id="claimGallery" type="file" accept="image/*" hidden></label><img id="prev" class="photoPrev" hidden alt=""></section>' +
       '<section class="q" data-q="consent"><div class="qTitle">Consent para sa customer photo</div><div class="qSub">“Puwede po ba kayong kunan ng photo kasama ang free sample, para sa documentation ng SMF Condo Sampling? Kasama rin po ang furbaby kung nandito. Optional po ito; makukuha ninyo ang sample kahit hindi kayo magpa-photo.”</div><div id="consentChoices" class="choices"><button type="button" class="choice" data-v="YES">Pumayag sa photo</button><button type="button" class="choice" data-v="NO">Hindi pumayag</button></div></section>' +
-      '<section class="q" id="customerSection" data-q="customerPhoto" hidden><div class="qTitle">Customer + free sample</div><div class="qSub">Kunan lang pagkatapos pumayag. Kita ang customer at free sample; isama ang furbaby kung present at posible.</div><label class="btn secondary" style="text-align:center">📷 Kunan ang customer + sample<input id="customerCam" type="file" accept="image/*" capture="environment" hidden disabled></label><img id="customerPrev" class="photoPrev" hidden alt="Preview ng customer photo"></section>' +
+      '<section class="q" id="customerSection" data-q="customerPhoto" hidden><div class="qTitle">Customer + free sample</div><div class="qSub">Kunan lang pagkatapos pumayag. Kita ang customer at free sample; isama ang furbaby kung present at posible.</div><label class="btn secondary" style="text-align:center">📷 Kunan ang customer + sample<input id="customerCam" type="file" accept="image/*" capture="environment" hidden disabled></label><label class="btn secondary" style="text-align:center">🖼️ Upload from gallery<input id="customerGallery" type="file" accept="image/*" hidden disabled></label><img id="customerPrev" class="photoPrev" hidden alt="Preview ng customer photo"></section>' +
       '<div id="err" class="errbox" hidden></div>' +
       '<button id="give" class="btn primary huge" type="button">✓ Sample given</button>' +
       '<section class="q" id="oosSection"><div class="qTitle">Customer tried to redeem — OOS</div><div class="qSub">Kung ubos ang sample, piliin ang variant na walang stock. I-record ang attempt; walang sample na bibilangin o ibabawas. Hindi kailangan ng customer photo.</div><div class="choices" id="oosProds" style="grid-template-columns:1fr"></div><button id="recordOos" class="btn secondary" type="button">Record customer tried — OOS</button></section>' +
@@ -188,12 +189,12 @@
       photoConsent = button.dataset.v;
       $("consentChoices").querySelectorAll(".choice").forEach(function (b) { b.classList.toggle("selected", b.dataset.v === photoConsent); });
       $("customerSection").hidden = photoConsent !== "YES";
-      $("customerCam").disabled = photoConsent !== "YES";
-      if (photoConsent !== "YES") { customerPhoto = ""; $("customerCam").value = ""; $("customerPrev").removeAttribute("src"); $("customerPrev").hidden = true; }
+      $("customerCam").disabled = $("customerGallery").disabled = photoConsent !== "YES";
+      if (photoConsent !== "YES") { customerPhoto = ""; $("customerCam").value = $("customerGallery").value = ""; $("customerPrev").removeAttribute("src"); $("customerPrev").hidden = true; }
       main.querySelector('[data-q="consent"]').classList.add("answered");
       paint();
     };
-    $("customerCam").onchange = async function () {
+    $("customerCam").onchange = $("customerGallery").onchange = async function () {
       var file = this.files && this.files[0]; if (!file || photoConsent !== "YES") return;
       try {
         var compressed = await compressPhoto(file);
@@ -212,7 +213,7 @@
       main.querySelector('[data-q="customerPhoto"]').classList.toggle("answered", !!customerPhoto);
     }
     $("prods").onclick = function (e) { var b = e.target.closest(".choice"); if (!b) return; chosen[b.dataset.v] = !chosen[b.dataset.v]; paint(); };
-    $("cam").onchange = async function () {
+    $("cam").onchange = $("claimGallery").onchange = async function () {
       var f = this.files && this.files[0]; if (!f) return;
       try { photo = await compressPhoto(f); $("prev").src = photo; $("prev").hidden = false; } catch (e) { toast(e.message); }
       paint();
@@ -269,9 +270,9 @@
       var ids = Object.keys(chosen).filter(function (k) { return chosen[k]; }), err = $("err");
       if (blocked) { err.hidden = false; err.textContent = "Hindi pwedeng i-claim ang ticket na ito."; return; }
       if (!ids.length) { err.hidden = false; err.textContent = "Pumili ng sample na ibinigay."; main.querySelector('[data-q="products"]').classList.add("bad"); return; }
-      if (!photo) { err.hidden = false; err.textContent = "Kunan muna ng photo ang claim screenshot."; main.querySelector('[data-q="photo"]').classList.add("bad"); return; }
+      if (!photo) { err.hidden = false; err.textContent = "Kunan o i-upload muna ang photo ng claim screenshot."; main.querySelector('[data-q="photo"]').classList.add("bad"); return; }
       if (!photoConsent) { err.hidden = false; err.textContent = "Itala muna kung pumayag o hindi pumayag sa customer photo."; return; }
-      if (photoConsent === "YES" && !customerPhoto) { err.hidden = false; err.textContent = "Kunan muna ang customer kasama ang free sample."; return; }
+      if (photoConsent === "YES" && !customerPhoto) { err.hidden = false; err.textContent = "Kunan o i-upload muna ang customer photo kasama ang free sample."; return; }
       var item = { photoConsent: photoConsent, customerPhoto: photoConsent === "YES" ? customerPhoto : "", redemptionId: uuid(), code: code, products: ids, photo: photo, phoneSavedAt: new Date().toISOString() };
       try { await SMFQueue.add(item); }
       catch (e) { err.hidden = false; err.textContent = "Hindi ma-save sa phone: " + e.message; return; }
