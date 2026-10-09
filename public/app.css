@@ -110,3 +110,9 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .sample.variant-maintenance{background:#e2f7f3;border-color:#199e91;color:#096f64}
 .sample.variant-small{background:#ffedf0;border-color:#e26e89;color:#99344a}
 .sample.variant-majesty{background:#f5eefa;border-color:#6a2c91;color:#6a2c91}
+
+/* Keep long staff labels and the ticket-entry row inside narrow phone screens. */
+.brand{min-width:0;flex:1}.brand p{overflow-wrap:anywhere}
+.brandmark,.pill{flex-shrink:0}
+.codeRow input{min-width:0}
+@media(max-width:360px){.top{padding:12px;gap:8px}.brandmark{width:44px}.content{padding-left:12px;padding-right:12px}.codeRow .btn{padding:0 12px;font-size:16px}}
