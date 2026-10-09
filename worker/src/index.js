@@ -173,6 +173,7 @@ export async function handleApi(request, env, deps = {}) {
       return json(await gw("redeem", {
         redemptionId: String(b.redemptionId || "").slice(0, 64), code: String(b.code || "").toUpperCase().slice(0, 20),
         products: Array.isArray(b.products) ? b.products.slice(0, 4).map(String) : [],
+        outOfStock: b.outOfStock === true, oosProducts: Array.isArray(b.oosProducts) ? b.oosProducts.slice(0, 4).map(String) : [],
         photo: b.photo || "", photoConsent: b.photoConsent, customerPhoto: b.customerPhoto || "", phoneSavedAt: String(b.phoneSavedAt || "").slice(0, 40),
         staffCode: s.staff.code, staffName: s.staff.name, condoId: s.condo.id
       }));

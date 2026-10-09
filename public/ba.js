@@ -84,7 +84,7 @@
       '<div class="card" style="margin-top:12px"><div class="cardTitle">O i-type ang ticket number</div><div class="codeRow"><input id="typed" class="big" placeholder="RR-0001" autocapitalize="characters" autocomplete="off"><button id="find" class="btn dark" type="button">Hanapin</button></div></div>' +
       '<div class="card"><div class="cardTitle">Ngayong araw • ' + esc(session.condo.name) + '</div><div class="stats"><div class="stat"><b id="sReg">–</b><span>Registered</span></div><div class="stat"><b id="sClaim">–</b><span>Na-claim</span></div><div class="stat"><b id="sWait">–</b><span>Naghihintay</span></div></div></div>' +
       '<div class="card"><div class="cardTitle">Natitirang sample (stock left)</div><div id="stock"><div class="helper">Loading…</div></div></div>' +
-      '<div class="card"><div class="cardTitle">Huling na-claim sa phone na ito</div><div id="recent" class="recent"></div></div>' +
+      '<div class="card"><div class="cardTitle">Huling records sa phone na ito</div><div id="recent" class="recent"></div></div>' +
       '<button id="out" class="linkBtn" type="button">Sign out</button>';
     $("scan").onclick = ticketPhotoScreen;
     $("find").onclick = function () { var c = $("typed").value.trim().toUpperCase(); if (c) claimScreen({ code: c }); };
@@ -105,7 +105,7 @@
     $("sReg").textContent = s.registered; $("sClaim").textContent = s.claimed; $("sWait").textContent = s.waiting;
     (s.stock || []).forEach(function (x) { products[x.id] = x.name; });
     $("stock").innerHTML = (s.stock || []).map(function (x) {
-      return '<div class="stockRow"><span>' + esc(x.name) + '</span><b class="' + (x.left <= 10 ? "low" : "") + '">' + x.left + " / " + x.allocated + "</b></div>";
+      return '<div class="stockRow"><span>' + esc(x.name) + '</span><b class="' + (x.left <= 10 ? "low" : "") + '">' + (x.left <= 0 ? 'OOS — ubos na' : x.left + ' / ' + x.allocated) + "</b></div>";
     }).join("") + (s.savedAt ? '<div class="helper">Updated ' + esc(s.savedAt) + "</div>" : "");
   }
 
@@ -167,7 +167,7 @@
   }
 
   async function claimScreen(found) {
-    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false, allowed = (found.samples || []).slice();
+    var code = found.code, chosen = {}, photo = found.ticketPhoto || "", customerPhoto = "", photoConsent = "", blocked = false, offline = false, allowed = (found.samples || []).slice(), oosChoices = {}, eligible = allowed.slice();
     (found.samples || []).forEach(function (id) { chosen[id] = true; });
     main.innerHTML =
       '<div class="card"><div class="cardTitle">Ticket</div><div style="font-size:36px;font-weight:900;letter-spacing:2px">' + esc(code) + '</div><div id="tinfo" class="helper" style="margin-top:4px">Chine-check…</div></div>' +
@@ -179,6 +179,7 @@
       '<section class="q" id="customerSection" data-q="customerPhoto" hidden><div class="qTitle">Customer + free sample</div><div class="qSub">Kunan lang pagkatapos pumayag. Kita ang customer at free sample; isama ang furbaby kung present at posible.</div><label class="btn secondary" style="text-align:center">📷 Kunan ang customer + sample<input id="customerCam" type="file" accept="image/*" capture="environment" hidden disabled></label><img id="customerPrev" class="photoPrev" hidden alt="Preview ng customer photo"></section>' +
       '<div id="err" class="errbox" hidden></div>' +
       '<button id="give" class="btn primary huge" type="button">✓ Sample given</button>' +
+      '<section class="q" id="oosSection"><div class="qTitle">Customer tried to redeem — OOS</div><div class="qSub">Kung ubos ang sample, piliin ang variant na walang stock. I-record ang attempt; walang sample na bibilangin o ibabawas. Hindi kailangan ng customer photo.</div><div class="choices" id="oosProds" style="grid-template-columns:1fr"></div><button id="recordOos" class="btn secondary" type="button">Record customer tried — OOS</button></section>' +
       '<button id="back" class="btn secondary" type="button">Cancel</button>';
     $("back").onclick = home;
     if (photo) { $("prev").src = photo; $("prev").hidden = false; }
@@ -204,6 +205,8 @@
     function paint() {
       var ids = allowed;
       $("prods").innerHTML = ids.map(function (id) { return '<button type="button" class="choice' + (chosen[id] ? " selected" : "") + '" data-v="' + id + '">' + esc(productName(id)) + "</button>"; }).join("");
+      $('give').disabled = blocked || !allowed.length || !Object.keys(chosen).some(function(id){return chosen[id];});
+      $('oosProds').innerHTML = eligible.map(function(id){return '<button type="button" class="choice'+(oosChoices[id]?' selected':'')+'" data-v="'+id+'">'+esc(productName(id))+'</button>';}).join('');
       main.querySelector('[data-q="products"]').classList.toggle("answered", Object.keys(chosen).some(function (k) { return chosen[k]; }));
       main.querySelector('[data-q="photo"]').classList.toggle("answered", !!photo);
       main.querySelector('[data-q="customerPhoto"]').classList.toggle("answered", !!customerPhoto);
@@ -231,9 +234,14 @@
           blocked = true;
           $("warn").innerHTML = '<div class="errbox">NA-CLAIM NA ito (' + esc(t.claimedAt) + ", " + esc(t.claimedBy) + "). Huwag nang ibigay ulit.</div>";
         } else if (t.condoId && t.condoId !== session.condo.id) {
+          blocked = true;
           $("warn").innerHTML = '<div class="warnbox">Ang ticket na ito ay galing sa ' + esc(t.condoName) + ". Siguraduhin bago ibigay.</div>";
         }
-        allowed = (t.samples || []).map(function (s) { return s.id; }); chosen = {}; allowed.forEach(function (id) { chosen[id] = true; }); paint();
+        eligible = (t.samples || []).concat(t.unavailableSamples || []).map(function(s){return s.id;}).filter(function(id,i,all){return all.indexOf(id)===i;});
+        oosChoices = {}; (t.unavailableSamples || []).forEach(function(s){oosChoices[s.id]=true;});
+        (t.samples || []).forEach(function(s){if(s.stockLeft<=0)oosChoices[s.id]=true;});
+        allowed = (t.samples || []).filter(function(s){return s.stockLeft===undefined || s.stockLeft>0;}).map(function(s){return s.id;}); chosen = {}; allowed.forEach(function(id){chosen[id]=true;}); paint();
+        if(Object.keys(oosChoices).length) $('warn').innerHTML += '<div class="errbox">OOS — wala nang available sample para sa: '+Object.keys(oosChoices).map(function(id){return esc(productName(id));}).join(', ')+'. Huwag ibigay ang ubos na variant. I-record ang customer attempt sa ibaba.</div>';
         if (t.noStock && !(t.samples || []).length) $("warn").innerHTML += '<div class="warnbox">Walang sample na naka-assign (ubos ang stock nung nag-register).</div>';
       }
       if (blocked) {
@@ -244,6 +252,18 @@
       offline = true;
       $("tinfo").textContent = "Offline: hindi ma-check ngayon. Ise-save sa phone at iche-check pag may signal.";
     }
+
+    $('oosProds').onclick = function(e){var b=e.target.closest('.choice');if(!b)return;oosChoices[b.dataset.v]=!oosChoices[b.dataset.v];paint();};
+    $('recordOos').onclick = async function(){
+      var ids=Object.keys(oosChoices).filter(function(id){return oosChoices[id];}), err=$('err');
+      if(blocked)return;
+      if(!ids.length){err.hidden=false;err.textContent='Piliin ang variant na wala nang stock.';return;}
+      this.disabled=true;
+      var item={redemptionId:uuid(),code:code,products:[],outOfStock:true,oosProducts:ids,photo:photo,phoneSavedAt:new Date().toISOString()};
+      try{await SMFQueue.add(item);}catch(e){this.disabled=false;err.hidden=false;err.textContent='Hindi ma-save sa phone: '+e.message;return;}
+      var recent=get(RECENT_KEY)||[];recent.unshift({redemptionId:item.redemptionId,code:code,items:'Customer tried — OOS: '+ids.map(productName).join(' + '),time:manilaTime(),date:manilaDate()});put(RECENT_KEY,recent.slice(0,50));
+      toast('OOS attempt saved sa phone; sine-send sa server. Walang sample released.');home();sync();
+    };
 
     $("give").onclick = async function () {
       var ids = Object.keys(chosen).filter(function (k) { return chosen[k]; }), err = $("err");
@@ -256,9 +276,9 @@
       try { await SMFQueue.add(item); }
       catch (e) { err.hidden = false; err.textContent = "Hindi ma-save sa phone: " + e.message; return; }
       var recent = get(RECENT_KEY) || [];
-      recent.unshift({ code: code, items: ids.map(function (id) { return productName(id).replace(/ 150g$/, "").replace("NutriChunks ", "NC ").replace("Majesty ", "MJ "); }).join(" + "), time: manilaTime(), date: manilaDate() });
+      recent.unshift({ redemptionId: item.redemptionId, code: code, items: ids.map(function (id) { return productName(id).replace(/ 150g$/, "").replace("NutriChunks ", "NC ").replace("Majesty ", "MJ "); }).join(" + "), time: manilaTime(), date: manilaDate() });
       put(RECENT_KEY, recent.slice(0, 50));
-      toast(offline ? "Saved sa phone ✓ (ise-send mamaya)" : "Saved ✓");
+      toast("Saved sa phone ✓; " + (offline ? "ise-send pag may signal." : "sine-send sa server."));
       home();
       sync();
     };
@@ -278,6 +298,10 @@
       });
       results.forEach(function (x) {
         var r = x.r && x.r.r;
+        if(r && r.result==='OOS'){
+          var recent=get(RECENT_KEY)||[];recent.forEach(function(entry){if(entry.redemptionId===x.item.redemptionId)entry.items='Customer tried — OOS (server confirmed; no sample released)';});put(RECENT_KEY,recent);if($('recent'))renderRecent();
+          toast(x.item.code+': Customer tried — OOS recorded. Walang sample released.',5000);
+        } else if(r && r.ok && r.result==='OK') toast(x.item.code+': Saved to Sheets ✓',3500);
         if (r && !r.ok && !r.already && (r.result === "DUPLICATE" || r.result === "UNKNOWN_CODE")) toast(x.item.code + ": " + (r.message || r.result), 4000);
       });
       if (results.length) loadStatus();

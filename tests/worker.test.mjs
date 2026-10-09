@@ -77,3 +77,16 @@ test('individual pet profiles survive the HTTP gateway and report counts each br
   assert.equal(report.brands.DOG.Pedigree,1);assert.equal(report.brands.DOG.Vitality,1);assert.equal(report.days.find(d=>d.condoId==='RR').dogs,2);
  } finally {s3.close();}
 });
+
+test('BA OOS flag and unavailable variants survive HTTP; reporting still counts zero releases',async()=>{
+ const {server:s4,gw:g4}=await startDevServer(8786,{testMode:false});
+ try {
+  const req=async(path,options={})=>fetch('http://localhost:8786'+path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}}).then(r=>r.json());
+  const t=(await req('/api/register',{method:'POST',body:JSON.stringify({condoId:'RR',consent:'YES',mobile:'09179999876',petType:'DOG',dog:{age:'ADULT',size:'SMALL'}})})).ticket;
+  const login=await req('/api/staff/login',{method:'POST',body:JSON.stringify({staffCode:'PM01',pin:g4.pinOf('PM01')})});
+  const r=await req('/api/redeem',{method:'POST',headers:{Authorization:'Bearer '+login.token},body:JSON.stringify({redemptionId:'http-oos',code:t.code,outOfStock:true,oosProducts:['NC_SMALL_BREED']})});
+  assert.equal(r.ok,true);assert.equal(r.result,'OOS');
+  const {buildReport}=await import('../worker/src/index.js');const report=buildReport(g4.call('report',{}));
+  assert.equal(report.flags[0].RESULT,'OOS');assert.equal(report.days.find(d=>d.condoId==='RR').claimed,0);assert.equal(report.days.find(d=>d.condoId==='RR').given.NC_SMALL_BREED,undefined);
+ }finally{s4.close();}
+});

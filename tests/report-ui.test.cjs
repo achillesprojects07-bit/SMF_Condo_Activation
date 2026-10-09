@@ -36,3 +36,9 @@ test('empty live report explains zero values without inventing chart activity',a
  ui.tab('residents');assert.match(ui.main.innerHTML,/No resident data yet/);
 });
 module.exports={renderDashboard,fixture};
+
+test('OOS attempts appear separately without becoming distributed packs',async()=>{
+ const attempt={DATE:'2026-10-09',CONDO_ID:'RR',CLAIM_CODE:'RR-OOS',RESULT:'OOS',BA_NAME:'Training BA',PRODUCTS_UNAVAILABLE:'DOG',SERVER_SAVED_AT:'2026-10-09 13:00:00'};
+ const ui=await renderDashboard({...fixture,flags:[attempt],redemptions:[attempt]});ui.tab('records');
+ assert.match(ui.main.innerHTML,/Customers tried to redeem — OOS \(1\)/);assert.match(ui.main.innerHTML,/Dog sample 150 g/);assert.match(ui.main.innerHTML,/2026-10-09 13:00:00/);assert.doesNotMatch(ui.main.innerHTML,/Claim attempts to review/);
+});

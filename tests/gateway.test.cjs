@@ -305,3 +305,28 @@ test('small and large adult dogs receive their distinct variants once; partial s
  const partial=g2.call('register',dogReg({dog:{profiles}})).ticket;
  assert.deepEqual(partial.samples.map(s=>s.id),['NC_SMALL_BREED','NC_MAINT_ADULT']);assert.equal(partial.noStock,true);
 });
+
+test('OOS attempt is saved once with no release and can be redeemed after restock',()=>{
+ const g=fresh();for(const row of g.sheets.get('STOCK').rows)if(row[1]==='RR'&&row[2]==='NC_SMALL_BREED')row[3]=0;
+ const t=g.call('register',dogReg()).ticket;
+ assert.equal(t.status,'NO_STOCK');assert.deepEqual(t.unavailableSamples.map(s=>s.id),['NC_SMALL_BREED']);
+ const attempt={redemptionId:'oos-1',code:t.code,staffCode:'PM01',condoId:'RR',outOfStock:true,oosProducts:['NC_SMALL_BREED','NC_SMALL_BREED']};
+ const r=g.call('redeem',attempt);assert.equal(r.ok,true);assert.equal(r.result,'OOS');
+ assert.equal(g.call('redeem',attempt).already,true);
+ const saved=g.table('REDEMPTIONS');assert.equal(saved.length,1);assert.equal(saved[0].PRODUCTS_GIVEN,'');assert.equal(saved[0].PRODUCTS_UNAVAILABLE,'NC_SMALL_BREED');assert.equal(saved[0].RESULT,'OOS');assert.ok(saved[0].SERVER_SAVED_AT);
+ assert.equal(g.table('REGISTRATIONS')[0].STATUS,'NO_STOCK');assert.equal(g.call('status',{condoId:'RR'}).claimed,0);
+ // A waiting reserved ticket can still be served after a reported physical shortage.
+ const g2=fresh(),t2=g2.call('register',dogReg()).ticket;
+ assert.equal(g2.call('redeem',{...attempt,code:t2.code}).result,'OOS');
+ assert.equal(g2.call('redeem',{redemptionId:'after-restock',code:t2.code,staffCode:'PM01',condoId:'RR',products:['NC_SMALL_BREED']}).result,'OK');
+});
+
+test('stock depleting after registration is checked under the claim lock and recorded as OOS',()=>{
+ const g=fresh(),t=g.call('register',dogReg()).ticket;
+ for(const row of g.sheets.get('STOCK').rows)if(row[1]==='RR'&&row[2]==='NC_SMALL_BREED')row[3]=0;
+ assert.equal(g.call('ticket',{code:t.code}).ticket.samples[0].stockLeft,0);
+ const r=g.call('redeem',{redemptionId:'race-oos',code:t.code,staffCode:'PM01',condoId:'RR',products:['NC_SMALL_BREED']});
+ assert.equal(r.result,'OOS');assert.equal(r.ok,true);assert.equal(g.table('REGISTRATIONS')[0].STATUS,'WAITING');
+ assert.equal(g.table('REDEMPTIONS')[0].PRODUCTS_GIVEN,'');assert.equal(g.call('status',{condoId:'RR'}).stock.find(s=>s.id==='NC_SMALL_BREED').given,0);
+ assert.equal(g.call('redeem',{redemptionId:'wrong-oos',code:t.code,staffCode:'PM01',outOfStock:true,oosProducts:['MJ_ADULT_SALMON']}).error,'BAD_OOS_PRODUCTS');
+});

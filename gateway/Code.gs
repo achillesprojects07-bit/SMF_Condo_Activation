@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.3-one-pack-per-variant';
+var VERSION = '1.4-oos-attempts';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -25,7 +25,7 @@ var TABLES = {
     'CAT_COUNT', 'CAT_NAMES', 'CAT_AGE', 'CAT_BRAND',
     'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE', 'DOG_PROFILES', 'CAT_PROFILES', 'DOG_BRAND_REASON', 'CAT_BRAND_REASON', 'SAMPLE_PRODUCTS', 'UNAVAILABLE_SAMPLES'],
   REDEMPTIONS: ['REDEMPTION_ID', 'CLAIM_CODE', 'DATE', 'CONDO_ID', 'STAFF_CODE', 'BA_NAME',
-    'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID', 'DATA_TYPE']
+    'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID', 'DATA_TYPE', 'PRODUCTS_UNAVAILABLE', 'ATTEMPT_TYPE']
 };
 
 var PRODUCT_SEED = [
@@ -313,16 +313,25 @@ function assignedSamples_(r) {
   return ids.filter(function (id, i, all) { return id && id !== 'NONE' && all.indexOf(id) === i; });
 }
 
+function unavailableSamples_(r) {
+  var ids = String(r.UNAVAILABLE_SAMPLES || '').split(',').map(function (id) { return id.trim(); }).filter(String);
+  // Compatibility for tickets created before all variants were recorded.
+  if (!ids.length && r.SAMPLE_DOG === 'NONE') ids.push(r.DOG_AGE === 'PUPPY' ? 'NC_PUPPY_LAMB' : r.DOG_SIZE === 'SMALL' ? 'NC_SMALL_BREED' : 'NC_MAINT_ADULT');
+  if (r.SAMPLE_CAT === 'NONE' && ids.indexOf('MJ_ADULT_SALMON') < 0) ids.push('MJ_ADULT_SALMON');
+  return ids;
+}
+
 function ticketView_(r, condo) {
   var names = {};
   products_().forEach(function (x) { names[x.PRODUCT_ID] = x.PRODUCT_NAME; });
-  var samples = assignedSamples_(r);
+  var samples = assignedSamples_(r), stock = stockFor_(r.CONDO_ID, r.DATE), unavailable = unavailableSamples_(r);
   return {
     code: r.CLAIM_CODE, date: r.DATE, registeredAt: r.REGISTERED_AT, status: r.STATUS,
     condoId: r.CONDO_ID, condoName: (condo && condo.CONDO_NAME) || r.CONDO_NAME,
     name: r.RESIDENT_NAME, petType: r.PET_TYPE,
     petNames: [r.DOG_NAMES, r.CAT_NAMES].filter(String).join(', '),
-    samples: samples.map(function (id) { return { id: id, name: names[id] || id }; }),
+    samples: samples.map(function (id) { return { id: id, name: names[id] || id, stockLeft: stock[id] ? Math.max(0, stock[id].left) : 0 }; }),
+    unavailableSamples: unavailable.map(function (id) { return { id: id, name: names[id] || id }; }),
     noStock: !!r.UNAVAILABLE_SAMPLES || [r.SAMPLE_DOG, r.SAMPLE_CAT].indexOf('NONE') >= 0,
     claimedAt: r.CLAIMED_AT || '', claimedBy: r.CLAIMED_BY || ''
   };
@@ -377,15 +386,27 @@ function redeem_(p) {
   if ((p.customerPhoto && p.photoConsent !== 'YES') || (p.photoConsent === 'YES' && !p.customerPhoto) || (p.photoConsent != null && ['YES', 'NO'].indexOf(p.photoConsent) < 0)) return { ok: false, error: 'PHOTO_CONSENT', message: 'I-check ang consent at customer photo.' };
   ensureColumns_('REGISTRATIONS'); ensureColumns_('REDEMPTIONS');
   var regs = read_('REGISTRATIONS'), reg = findReg_(p.code, regs);
+  if (reg && p.condoId && String(p.condoId).toUpperCase() !== reg.CONDO_ID.toUpperCase()) return {ok:false,error:'WRONG_ASSIGNMENT',message:'Gamitin ang ticket para sa iyong assigned condo.'};
   if (reg && trainingStaff_(p.staffCode) !== trainingRow_(reg)) return { ok: false, error: 'WRONG_ASSIGNMENT', message: 'Gamitin ang ticket para sa iyong assigned condo. Training accounts use TRAIN tickets.' };
   var products = {};
   products_().forEach(function (x) { products[x.PRODUCT_ID] = x; });
   var given = (p.products || []).filter(function (id, i, all) { return products[id] && all.indexOf(id) === i; });
   if (reg && given.some(function (id) { return assignedSamples_(reg).indexOf(id) < 0; })) return { ok: false, error: 'UNASSIGNED_PRODUCT', message: 'Ibigay lang ang naka-assign sa ticket: isang pack bawat applicable variant.' };
-  var result = 'OK', note = '';
+  var result = 'OK', note = '', unavailable = [], explicitOos = p.outOfStock === true;
   if (!reg) { result = 'UNKNOWN_CODE'; note = 'Ticket number not found'; }
   else if (reg.STATUS === 'CLAIMED') { result = 'DUPLICATE'; note = 'Already claimed ' + reg.CLAIMED_AT + ' by ' + reg.CLAIMED_BY; }
-  else if (!given.length) { result = 'NO_PRODUCT'; note = 'No sample selected'; }
+  else if (explicitOos) {
+    var eligible = assignedSamples_(reg).concat(unavailableSamples_(reg));
+    unavailable = (p.oosProducts || []).filter(function(id,i,all){return products[id] && all.indexOf(id)===i;});
+    if (!unavailable.length || unavailable.some(function(id){return eligible.indexOf(id)<0;})) return {ok:false,error:'BAD_OOS_PRODUCTS',message:'Piliin ang variant sa ticket na wala nang stock.'};
+    result = 'OOS'; note = 'Customer tried to redeem — OOS; no sample released. BA confirmed no stock for: ' + unavailable.join(', ');
+  } else if (!given.length) { result = 'NO_PRODUCT'; note = 'No sample selected'; }
+  else {
+    var stock = stockFor_(reg.CONDO_ID, reg.DATE, regs);
+    unavailable = given.filter(function(id){return !stock[id] || stock[id].left<=0;});
+    if (unavailable.length) { result='OOS'; note='Customer tried to redeem — OOS; no sample released. Stock depleted for: '+unavailable.join(', '); }
+  }
+  if (result !== 'OK') given = [];
 
   var photo = { url: '', id: '' };
   try { photo = savePhoto_(p.photo, (p.code || 'unknown') + '_' + rid.slice(0, 8)); } catch (e) { note = (note ? note + '; ' : '') + 'Photo not saved: ' + e.message; }
@@ -402,7 +423,8 @@ function redeem_(p) {
     PRODUCTS_GIVEN: given.join(', '), RESULT: result, PHOTO_URL: photo.url, PHOTO_FILE_ID: photo.id,
     PHONE_SAVED_AT: String(p.phoneSavedAt || ''), SERVER_SAVED_AT: nowText_(), NOTE: note,
     PHOTO_CONSENT: p.photoConsent || 'NOT_RECORDED', CUSTOMER_PHOTO_URL: customerPhoto.url, CUSTOMER_PHOTO_FILE_ID: customerPhoto.id,
-    DATA_TYPE: trainingStaff_(p.staffCode) || trainingCondo_(p.condoId) || (reg && trainingRow_(reg)) ? 'TRAINING' : 'LIVE'
+    DATA_TYPE: trainingStaff_(p.staffCode) || trainingCondo_(p.condoId) || (reg && trainingRow_(reg)) ? 'TRAINING' : 'LIVE',
+    PRODUCTS_UNAVAILABLE: unavailable.join(', '), ATTEMPT_TYPE: explicitOos ? 'OOS_REPORTED' : 'RELEASE'
   });
   if (result === 'OK') {
     update_('REGISTRATIONS', reg._row, {
@@ -410,8 +432,8 @@ function redeem_(p) {
       SAMPLES_GIVEN: given.join(', '), PHOTO_URL: photo.url, PHOTO_CONSENT: p.photoConsent || 'NOT_RECORDED', CUSTOMER_PHOTO_URL: customerPhoto.url
     });
   }
-  var msg = { OK: 'Saved', DUPLICATE: 'Na-claim na ang ticket na ito dati.', UNKNOWN_CODE: 'Walang ticket na ganitong number.', NO_PRODUCT: 'Walang napiling sample.' };
-  return { ok: result === 'OK', result: result, message: msg[result] || result, note: note };
+  var msg = { OOS: 'Recorded: customer tried to redeem — OOS. Walang sample na na-release.', OK: 'Saved', DUPLICATE: 'Na-claim na ang ticket na ito dati.', UNKNOWN_CODE: 'Walang ticket na ganitong number.', NO_PRODUCT: 'Walang napiling sample.' };
+  return { ok: result === 'OK' || result === 'OOS', result: result, message: msg[result] || result, note: note };
 }
 
 function status_(p) {
