@@ -99,3 +99,8 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 
 .free{color:var(--freeGreen)}.nc{color:var(--ncOrange)}.mj{color:var(--mjPurple)}
 .heroTitle .free,.brand h1 .free{font-weight:900}
+
+.petPhoto{margin:16px 0}
+.petPhoto .qSub{margin:8px 0 14px;line-height:1.45}
+.petPhoto strong{display:block}
+.petPhoto .petPreview{max-height:320px;object-fit:contain}
