@@ -24,8 +24,8 @@
 <template id="formTpl">
   <div class="hero">
     <div class="heroTitle">Welcome, pet parent!</div>
-    <div class="heroSub">Answer a few short questions (about 1 minute), then show your QR code to our NutriChunks &amp; Majesty <b>Pet Pals</b> at the booth to receive <b class="free">FREE</b> <b class="nc">NutriChunks</b> (dog food) or <b class="mj">Majesty</b> (cat food) for your pet.</div>
-    <div class="heroNote"><b>NOTE:</b> Available while supplies last. One free pack per mobile number.</div>
+    <div class="heroSub">Answer a few short questions , then show your QR code to our NutriChunks &amp; Majesty <b>Pet Pals</b> at the booth to receive <b class="free">FREE</b> <b class="nc">NutriChunks</b> (dog food) or <b class="mj">Majesty</b> (cat food) for your pet.</div>
+    <div class="heroNote"><b>NOTE:</b> Available while supplies last. One registration per mobile number. Up to one dog pack and one cat pack, while supplies last.</div>
   </div>
 
   <section class="q" data-q="consent">
@@ -50,60 +50,20 @@
 
     <div id="dogPart" hidden>
       <div class="partHead">🐶 About your dog</div>
-      <section class="q" data-q="dogNames">
-        <div class="qTitle">Dog's name</div>
-        <div class="qSub">If you have more than one, list all names (e.g. Choco, Max)</div>
-        <input id="dogNames" class="big" maxlength="120" autocomplete="off" placeholder="Choco">
-      </section>
       <section class="q" data-q="dogCount">
         <div class="qTitle">How many dogs do you have?</div>
         <div class="stepper" data-name="dogCount"><button type="button" class="stepBtn" data-d="-1">−</button><span class="stepValue">1</span><button type="button" class="stepBtn" data-d="1">+</button></div>
       </section>
-      <section class="q" data-q="dogAge">
-        <div class="qTitle">Age</div>
-        <div class="choices two" data-name="dogAge">
-          <button type="button" class="choice" data-v="PUPPY">Puppy (below 1 yr)</button>
-          <button type="button" class="choice" data-v="ADULT">Adult (1 yr+)</button>
-        </div>
-      </section>
-      <section class="q" data-q="dogSize">
-        <div class="qTitle">Size</div>
-        <div class="choices three" data-name="dogSize">
-          <button type="button" class="choice" data-v="SMALL">Small<small>Shih Tzu, Pom, Chihuahua</small></button>
-          <button type="button" class="choice" data-v="MEDIUM">Medium<small>Beagle, Aspin</small></button>
-          <button type="button" class="choice" data-v="LARGE">Large<small>Lab, Husky</small></button>
-        </div>
-      </section>
-      <section class="q" data-q="dogBrand">
-        <div class="qTitle">Which dog food brand do you use now?</div>
-        <div class="choices brands" data-name="dogBrand"></div>
-        <input id="dogBrandOther" class="big" maxlength="60" placeholder="Brand name" hidden>
-      </section>
+      <div id="dogProfiles"></div>
     </div>
 
     <div id="catPart" hidden>
       <div class="partHead">🐱 About your cat</div>
-      <section class="q" data-q="catNames">
-        <div class="qTitle">Cat's name</div>
-        <div class="qSub">If you have more than one, list all names (e.g. Mingming, Tiger)</div>
-        <input id="catNames" class="big" maxlength="120" autocomplete="off" placeholder="Mingming">
-      </section>
       <section class="q" data-q="catCount">
         <div class="qTitle">How many cats do you have?</div>
         <div class="stepper" data-name="catCount"><button type="button" class="stepBtn" data-d="-1">−</button><span class="stepValue">1</span><button type="button" class="stepBtn" data-d="1">+</button></div>
       </section>
-      <section class="q" data-q="catAge">
-        <div class="qTitle">Age</div>
-        <div class="choices two" data-name="catAge">
-          <button type="button" class="choice" data-v="KITTEN">Kitten (below 1 yr)</button>
-          <button type="button" class="choice" data-v="ADULT">Adult (1 yr+)</button>
-        </div>
-      </section>
-      <section class="q" data-q="catBrand">
-        <div class="qTitle">Which cat food brand do you use now?</div>
-        <div class="choices brands" data-name="catBrand"></div>
-        <input id="catBrandOther" class="big" maxlength="60" placeholder="Brand name" hidden>
-      </section>
+      <div id="catProfiles"></div>
     </div>
 
     <div id="youPart" hidden>
@@ -114,7 +74,7 @@
       </section>
       <section class="q" data-q="mobile">
         <div class="qTitle">Mobile number</div>
-        <div class="qSub">One free pack per mobile number</div>
+        <div class="qSub">One registration per mobile number</div>
         <input id="mobile" class="big" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="09171234567">
         <div id="mobileHint" class="hint" hidden>Please enter 11 digits starting with 09.</div>
       </section>

@@ -65,3 +65,15 @@ test("only GATEWAY_URL + GATEWAY_SECRET set: sign-in works and the report passco
     assert.equal((await jj("/api/report", { headers: { Authorization: "Bearer " + ok.body.token } })).body.ok, true);
   } finally { s2.close(); }
 });
+
+test('individual pet profiles survive the HTTP gateway and report counts each brand per household',async()=>{
+ const {server:s3,gw:g3}=await startDevServer(8787,{testMode:false});
+ try {
+  const profiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',reason:'Pet likes it'}];
+  const r=await fetch('http://localhost:8787/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({condoId:'RR',consent:'YES',mobile:'09171111987',name:'Training Test',petType:'DOG',dog:{profiles,sampleIndex:1}})}).then(r=>r.json());
+  assert.equal(r.ok,true);assert.equal(r.ticket.samples[0].id,'NC_MAINT_ADULT');
+  assert.deepEqual(JSON.parse(g3.table('REGISTRATIONS')[0].DOG_PROFILES),profiles);
+  const {buildReport}=await import('../worker/src/index.js');const report=buildReport(g3.call('report',{}));
+  assert.equal(report.brands.DOG.Pedigree,1);assert.equal(report.brands.DOG.Vitality,1);assert.equal(report.days.find(d=>d.condoId==='RR').dogs,2);
+ } finally {s3.close();}
+});

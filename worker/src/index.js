@@ -84,8 +84,11 @@ export function buildReport(raw) {
     if (r.STATUS === "CLAIMED") { x.claimed++; for (const id of String(r.SAMPLES_GIVEN || "").split(",").map(s => s.trim()).filter(Boolean)) x.given[id] = (x.given[id] || 0) + 1; }
     else if (r.STATUS === "WAITING") x.waiting++;
     else if (r.STATUS === "NO_STOCK") x.noStock++;
-    if (r.DOG_BRAND) brands.DOG[r.DOG_BRAND] = (brands.DOG[r.DOG_BRAND] || 0) + 1;
-    if (r.CAT_BRAND) brands.CAT[r.CAT_BRAND] = (brands.CAT[r.CAT_BRAND] || 0) + 1;
+    for (const pet of ['DOG','CAT']) {
+      let profiles=[];try{profiles=JSON.parse(r[pet+'_PROFILES']||'[]');}catch{}
+      const labels=Array.isArray(profiles)&&profiles.length?profiles.map(p=>p.brand):[r[pet+'_BRAND']];
+      for(const label of new Set(labels.filter(Boolean)))brands[pet][label]=(brands[pet][label]||0)+1;
+    }
   }
   for (const x of days.values()) for (const id of Object.keys(productName)) x.left[id] = (x.allocated[id] || 0) - (x.given[id] || 0);
   const rows = [...days.values()].sort((a, b) => a.date.localeCompare(b.date) || a.condoName.localeCompare(b.condoName));
@@ -187,7 +190,9 @@ function clean(x) {
     names: String(x.names || "").trim().slice(0, 120),
     age: String(x.age || "").toUpperCase().slice(0, 10),
     size: String(x.size || "").toUpperCase().slice(0, 10),
-    brand: String(x.brand || "").trim().slice(0, 60)
+    brand: String(x.brand || "").trim().slice(0, 60),
+    sampleIndex: Number.isInteger(x.sampleIndex) ? x.sampleIndex : 0,
+    profiles: Array.isArray(x.profiles) ? x.profiles.slice(0,30).map(p => ({name:String(p.name||'').trim().slice(0,60),age:String(p.age||'').toUpperCase().slice(0,10),size:String(p.size||'').toUpperCase().slice(0,10),brand:String(p.brand||'').trim().slice(0,100),reason:String(p.reason||'').trim().slice(0,200)})) : undefined
   };
 }
 

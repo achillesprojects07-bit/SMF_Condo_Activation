@@ -6,6 +6,7 @@
   var TICKET_KEY = "smfc_ticket_v1";
   var state = { consent: "", petType: "", dogCount: 1, catCount: 1, dogAge: "", dogSize: "", dogBrand: "", catAge: "", catBrand: "", promo: "" };
   var info = null;
+  var profiles = {dog: [], cat: []}, sampleDogIndex = 0;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -82,51 +83,45 @@
 
   function isOther(v) { return /^iba/i.test(v || "") || /other/i.test(v || ""); }
 
+  function petBlank() { return {name:'', age:'', size:'', brand:'', brandOther:'', reason:'', reasonOther:''}; }
+  function profileValid(p, pet) { return p.name.trim() && p.age && (pet === 'cat' || p.size) && p.brand && (!isOther(p.brand) || p.brandOther.trim()) && p.reason && (p.reason !== 'Other' || p.reasonOther.trim()); }
+  function options(list, selected) { return '<option value="">Choose an answer</option>' + list.map(function(x){var v=Array.isArray(x)?x[0]:x, label=Array.isArray(x)?x[1]:x;return '<option value="'+esc(v)+'"'+(v===selected?' selected':'')+'>'+esc(label)+'</option>';}).join(''); }
+  function renderPets(pet) {
+    var n=state[pet+'Count']; while(profiles[pet].length<n) profiles[pet].push(petBlank());
+    profiles[pet].length=n; if(sampleDogIndex>=profiles.dog.length)sampleDogIndex=0;
+    $(pet+'Profiles').innerHTML=profiles[pet].map(function(p,i){
+      var key=pet+'Profile'+i, brands=(info.brands||[]).filter(function(b){return b.petType===pet.toUpperCase()||b.petType==='BOTH';}).map(function(b){return b.brand;});
+      function field(k,label,list) {return '<label style="display:block;margin:14px 0">'+label+(list?'<select class="big" data-pet="'+pet+'" data-index="'+i+'" data-field="'+k+'">'+options(list,p[k])+'</select>':'<input class="big" maxlength="60" data-pet="'+pet+'" data-index="'+i+'" data-field="'+k+'" value="'+esc(p[k])+'">')+'</label>';}
+      return '<section class="q" data-q="'+key+'"><div class="qTitle">'+(pet==='dog'?'Dog':'Cat')+' '+(i+1)+'</div>'+field('name',"Pet's name")+field('age','Age',pet==='dog'?[['PUPPY','Puppy (below 1 yr)'],['ADULT','Adult (1 yr+)']]:[['KITTEN','Kitten (below 1 yr)'],['ADULT','Adult (1 yr+)']])+(pet==='dog'?field('size','Size',[['SMALL','Small'],['MEDIUM','Medium'],['LARGE','Large']]):'')+field('brand','Current '+pet+' food brand',brands)+ '<div data-extra="brand"'+(!isOther(p.brand)?' hidden':'')+'>'+field('brandOther','Other brand name')+'</div>'+field('reason','Why do you use this food for this '+pet+'?',['Pet likes it','Price / budget','Recommended by vet','Recommended by family / friends','Easy to find','Nutrition / health needs','Used to this food','Other'])+'<div data-extra="reason"'+(p.reason!=='Other'?' hidden':'')+'>'+field('reasonOther','Other reason')+'</div></section>';
+    }).join('');
+    if(pet==='dog'&&n>1) $(pet+'Profiles').innerHTML+='<section class="q"><div class="qTitle">Which dog will receive the free dog sample?</div><div class="qSub">One dog sample per registration. All dogs are recorded separately.</div><select class="big" id="sampleDogIndex">'+profiles.dog.map(function(p,i){return '<option value="'+i+'"'+(sampleDogIndex===i?' selected':'')+'>Dog '+(i+1)+'</option>';}).join('')+'</select></section>';
+  }
   function answered() {
-    var a = {};
-    a.consent = state.consent === "YES";
-    a.petType = !!state.petType;
-    a.dogNames = !!($("dogNames").value.trim());
-    a.dogCount = true;
-    a.dogAge = !!state.dogAge;
-    a.dogSize = !!state.dogSize;
-    a.dogBrand = !!state.dogBrand && (!isOther(state.dogBrand) || !!$("dogBrandOther").value.trim());
-    a.catNames = !!($("catNames").value.trim());
-    a.catCount = true;
-    a.catAge = !!state.catAge;
-    a.catBrand = !!state.catBrand && (!isOther(state.catBrand) || !!$("catBrandOther").value.trim());
-    a.name = $("name").value.trim().length >= 2;
-    a.mobile = /^09\d{9}$/.test(normMobile($("mobile").value));
-    a.promo = !!state.promo;
-    return a;
+    var a={consent:state.consent==='YES',petType:!!state.petType,name:$('name').value.trim().length>=2,mobile:/^09\d{9}$/.test(normMobile($('mobile').value)),promo:!!state.promo,dogCount:true,catCount:true};
+    ['dog','cat'].forEach(function(pet){profiles[pet].forEach(function(p,i){a[pet+'Profile'+i]=!!profileValid(p,pet);});});return a;
   }
-
   function refresh() {
-    var a = answered();
-    main.querySelectorAll(".q").forEach(function (q) { q.classList.toggle("answered", !!a[q.dataset.q]); q.classList.remove("bad"); });
-    $("noConsent").hidden = state.consent !== "NO";
-    $("afterConsent").hidden = state.consent !== "YES";
-    var dog = state.petType === "DOG" || state.petType === "BOTH", cat = state.petType === "CAT" || state.petType === "BOTH";
-    $("dogPart").hidden = !dog; $("catPart").hidden = !cat;
-    $("youPart").hidden = !state.petType;
-    $("dogBrandOther").hidden = !isOther(state.dogBrand);
-    $("catBrandOther").hidden = !isOther(state.catBrand);
-    var m = $("mobile").value.trim();
-    $("mobileHint").hidden = !m || a.mobile || m.replace(/\D/g, "").length < 10;
+    var a=answered();main.querySelectorAll('.q').forEach(function(q){q.classList.toggle('answered',!!a[q.dataset.q]);q.classList.remove('bad');});
+    $('noConsent').hidden=state.consent!=='NO';$('afterConsent').hidden=state.consent!=='YES';
+    $('dogPart').hidden=state.petType!=='DOG'&&state.petType!=='BOTH';$('catPart').hidden=state.petType!=='CAT'&&state.petType!=='BOTH';$('youPart').hidden=!state.petType;
+    var m=$('mobile').value.trim();$('mobileHint').hidden=!m||a.mobile||m.replace(/\D/g,'').length<10;
   }
-
   function missing() {
-    var a = answered(), need = ["consent", "petType"];
-    if (state.petType === "DOG" || state.petType === "BOTH") need = need.concat(["dogNames", "dogAge", "dogSize", "dogBrand"]);
-    if (state.petType === "CAT" || state.petType === "BOTH") need = need.concat(["catNames", "catAge", "catBrand"]);
-    need = need.concat(["name", "mobile", "promo"]);
-    return need.filter(function (k) { return !a[k]; });
+    var a=answered(),need=['consent','petType','name','mobile','promo'];
+    ['dog','cat'].forEach(function(pet){if(state.petType===pet.toUpperCase()||state.petType==='BOTH')profiles[pet].forEach(function(p,i){need.push(pet+'Profile'+i);});});return need.filter(function(k){return !a[k];});
   }
 
   function buildForm() {
     main.innerHTML = $("formTpl").innerHTML;
-    main.querySelector('[data-name="dogBrand"]').innerHTML = brandButtons("DOG");
-    main.querySelector('[data-name="catBrand"]').innerHTML = brandButtons("CAT");
+    renderPets('dog');renderPets('cat');
+    function profileInput(e) {
+      var t=e.target;
+      if(t.id==='sampleDogIndex'){sampleDogIndex=Number(t.value);return;}
+      if(!t.dataset.pet)return;
+      var p=profiles[t.dataset.pet][Number(t.dataset.index)];p[t.dataset.field]=t.value;
+      var card=t.closest('.q');card.querySelector('[data-extra="brand"]').hidden=!isOther(p.brand);card.querySelector('[data-extra="reason"]').hidden=p.reason!=='Other';refresh();
+    }
+    main.addEventListener('input',profileInput);main.addEventListener('change',profileInput);
     main.querySelectorAll(".choices").forEach(function (group) {
       group.addEventListener("click", function (e) {
         var b = e.target.closest(".choice"); if (!b) return;
@@ -140,6 +135,7 @@
         var n = st.dataset.name;
         state[n] = Math.max(1, Math.min(30, state[n] + Number(b.dataset.d)));
         st.querySelector(".stepValue").textContent = state[n];
+        renderPets(n==='dogCount'?'dog':'cat');refresh();
       });
     });
     main.querySelectorAll("input").forEach(function (i) { i.addEventListener("input", refresh); });
@@ -159,14 +155,15 @@
     err.hidden = true;
     var btn = $("submit");
     btn.disabled = true; btn.textContent = "Saving…";
-    var dogBrand = isOther(state.dogBrand) ? "Other: " + $("dogBrandOther").value.trim() : state.dogBrand;
-    var catBrand = isOther(state.catBrand) ? "Other: " + $("catBrandOther").value.trim() : state.catBrand;
+    function petPayload(pet) {
+      var list=profiles[pet].map(function(p){return {name:p.name.trim(),age:p.age,size:pet==='dog'?p.size:'',brand:isOther(p.brand)?'Other: '+p.brandOther.trim():p.brand,reason:p.reason==='Other'?'Other: '+p.reasonOther.trim():p.reason};});
+      return {profiles:list,count:list.length,sampleIndex:pet==='dog'?sampleDogIndex:0};
+    }
     var regId = uuid();
     var payload = {
       condoId: condoId, regId: regId, consent: "YES", promoOptIn: state.promo,
       name: $("name").value.trim(), mobile: normMobile($("mobile").value), petType: state.petType,
-      dog: { names: $("dogNames").value.trim(), count: state.dogCount, age: state.dogAge, size: state.dogSize, brand: dogBrand },
-      cat: { names: $("catNames").value.trim(), count: state.catCount, age: state.catAge, brand: catBrand }
+      dog: petPayload('dog'), cat: petPayload('cat')
     };
     var r;
     try { r = await api("/api/register", { method: "POST", body: JSON.stringify(payload) }); }
@@ -185,7 +182,7 @@
 
   async function start() {
     var t = loadTicket();
-    if (t && t.code) { $("condoLine").textContent = t.condoName || ""; return refreshTicket(t); }
+    if (t && t.code && (!condoId || t.condoId === condoId)) { $("condoLine").textContent = t.condoName || ""; return refreshTicket(t); }
     if (!condoId) { main.innerHTML = '<div class="errbox">Please scan the QR code at the booth to register.</div>'; return; }
     try { info = await api("/api/condo?c=" + encodeURIComponent(condoId)); }
     catch (e) { info = { ok: false, message: "No internet connection. Please try again when you have signal." }; }

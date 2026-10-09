@@ -23,7 +23,7 @@ var TABLES = {
     'CONSENT', 'PROMO_OPT_IN', 'RESIDENT_NAME', 'MOBILE', 'PET_TYPE',
     'DOG_COUNT', 'DOG_NAMES', 'DOG_AGE', 'DOG_SIZE', 'DOG_BRAND',
     'CAT_COUNT', 'CAT_NAMES', 'CAT_AGE', 'CAT_BRAND',
-    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE'],
+    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE', 'DOG_PROFILES', 'CAT_PROFILES', 'DOG_BRAND_REASON', 'CAT_BRAND_REASON'],
   REDEMPTIONS: ['REDEMPTION_ID', 'CLAIM_CODE', 'DATE', 'CONDO_ID', 'STAFF_CODE', 'BA_NAME',
     'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID', 'DATA_TYPE']
 };
@@ -261,6 +261,16 @@ function condoInfo_(p) {
   };
 }
 
+function normalizePet_(pet, kind) {
+  if (!Array.isArray(pet.profiles)) return pet;
+  var list=pet.profiles;
+  if (!list.length || list.length>30 || list.some(function(x){return !x || !String(x.name||'').trim() || (kind==='DOG'?['PUPPY','ADULT']:['KITTEN','ADULT']).indexOf(x.age)<0 || (kind==='DOG'&&['SMALL','MEDIUM','LARGE'].indexOf(x.size)<0) || !String(x.brand||'').trim() || !String(x.reason||'').trim();})) return null;
+  var index=pet.sampleIndex===undefined?0:Number(pet.sampleIndex);
+  if(index%1!==0||index<0||index>=list.length)return null;
+  function unique(k){return list.map(function(x){return String(x[k]||'');}).filter(function(x,i,a){return a.indexOf(x)===i;}).join(', ');}
+  return {profiles:list,count:list.length,names:list.map(function(x){return x.name;}).join(', '),age:unique('age'),size:unique('size'),brand:unique('brand'),reason:unique('reason'),sampleAge:list[index].age,sampleSize:list[index].size};
+}
+
 function register_(p) {
   ensureColumns_('REGISTRATIONS');
   var condo = findCondo_(p.condoId);
@@ -281,10 +291,11 @@ function register_(p) {
   var petType = String(p.petType || '').toUpperCase();
   var hasDog = petType === 'DOG' || petType === 'BOTH', hasCat = petType === 'CAT' || petType === 'BOTH';
   if (!hasDog && !hasCat) return { ok: false, error: 'BAD_PET', message: 'Please choose Dog, Cat, or Dog & Cat.' };
-  var dog = p.dog || {}, cat = p.cat || {};
+  var dog = hasDog ? normalizePet_(p.dog || {}, 'DOG') : {}, cat = hasCat ? normalizePet_(p.cat || {}, 'CAT') : {};
+  if(!dog||!cat)return {ok:false,error:'BAD_PET_DETAILS',message:'Please complete the name, age, current food brand and reason for every pet, plus size for every dog.'};
 
   var stock = stockFor_(condo.CONDO_ID, date, regs);
-  var sampleDog = hasDog ? pickDog_(String(dog.age || '').toUpperCase(), String(dog.size || '').toUpperCase(), stock) : '';
+  var sampleDog = hasDog ? pickDog_(String(dog.sampleAge || dog.age || '').toUpperCase(), String(dog.sampleSize || dog.size || '').toUpperCase(), stock) : '';
   var sampleCat = hasCat ? pickCat_(stock) : '';
   var gotSome = (sampleDog && sampleDog !== 'NONE') || (sampleCat && sampleCat !== 'NONE');
 
@@ -293,10 +304,11 @@ function register_(p) {
     CLAIM_CODE: code, REG_ID: String(p.regId || Utilities.getUuid()), REGISTERED_AT: nowText_(), DATE: date,
     CONDO_ID: condo.CONDO_ID, CONDO_NAME: condo.CONDO_NAME, CONSENT: 'YES', PROMO_OPT_IN: p.promoOptIn === 'YES' ? 'YES' : 'NO',
     RESIDENT_NAME: String(p.name || '').slice(0, 80), MOBILE: mobile, PET_TYPE: petType,
-    DOG_COUNT: hasDog ? Number(dog.count) || 1 : '', DOG_NAMES: hasDog ? String(dog.names || '').slice(0, 120) : '',
-    DOG_AGE: hasDog ? String(dog.age || '') : '', DOG_SIZE: hasDog ? String(dog.size || '') : '', DOG_BRAND: hasDog ? String(dog.brand || '').slice(0, 60) : '',
-    CAT_COUNT: hasCat ? Number(cat.count) || 1 : '', CAT_NAMES: hasCat ? String(cat.names || '').slice(0, 120) : '',
-    CAT_AGE: hasCat ? String(cat.age || '') : '', CAT_BRAND: hasCat ? String(cat.brand || '').slice(0, 60) : '',
+    DOG_COUNT: hasDog ? Number(dog.count) || 1 : '', DOG_NAMES: hasDog ? String(dog.names || '').slice(0, 2000) : '',
+    DOG_AGE: hasDog ? String(dog.age || '') : '', DOG_SIZE: hasDog ? String(dog.size || '') : '', DOG_BRAND: hasDog ? String(dog.brand || '').slice(0, 3000) : '',
+    CAT_COUNT: hasCat ? Number(cat.count) || 1 : '', CAT_NAMES: hasCat ? String(cat.names || '').slice(0, 2000) : '',
+    CAT_AGE: hasCat ? String(cat.age || '') : '', CAT_BRAND: hasCat ? String(cat.brand || '').slice(0, 3000) : '',
+    DOG_PROFILES: hasDog && dog.profiles ? JSON.stringify(dog.profiles) : '', CAT_PROFILES: hasCat && cat.profiles ? JSON.stringify(cat.profiles) : '', DOG_BRAND_REASON: hasDog ? String(dog.reason||'') : '', CAT_BRAND_REASON: hasCat ? String(cat.reason||'') : '',
     SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, STATUS: gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
   };
   append_('REGISTRATIONS', row);

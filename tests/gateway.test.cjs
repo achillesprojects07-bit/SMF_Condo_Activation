@@ -251,3 +251,25 @@ test('old demo claims are excluded while failed demo attempts cannot hide a real
   g.ctx.append_('REDEMPTIONS',{CLAIM_CODE:t.ticket.code, STAFF_CODE:'DEMO-001', RESULT:'OK'});
   assert.equal(g.call('report',{}).registrations.length,0);
 });
+
+test('mixed puppy/adult and kitten/adult profiles keep separate brands and reasons', () => {
+  const g=fresh();
+  const dogProfiles=[{name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Price / budget'},{name:'Max',age:'ADULT',size:'LARGE',brand:'Vitality',reason:'Pet likes it'}];
+  const catProfiles=[{name:'Kit',age:'KITTEN',brand:'Whiskas',reason:'Easy to find'},{name:'Ming',age:'ADULT',brand:'Cuties',reason:'Recommended by vet'}];
+  const r=g.call('register',dogReg({petType:'BOTH',dog:{count:99,profiles:dogProfiles,sampleIndex:1},cat:{profiles:catProfiles}}));
+  assert.equal(r.ok,true);assert.deepEqual(r.ticket.samples.map(s=>s.id),['NC_MAINT_ADULT','MJ_ADULT_SALMON']);
+  const row=g.table('REGISTRATIONS')[0];assert.equal(row.DOG_COUNT,2);assert.equal(row.CAT_COUNT,2);
+  assert.deepEqual(JSON.parse(row.DOG_PROFILES),dogProfiles);assert.deepEqual(JSON.parse(row.CAT_PROFILES),catProfiles);
+  assert.match(row.DOG_BRAND_REASON,/Price/);assert.match(row.CAT_BRAND_REASON,/vet/);
+  assert.equal(row.DOG_AGE,'PUPPY, ADULT');assert.equal(row.CAT_AGE,'KITTEN, ADULT');
+  assert.equal(r.ticket.samples.length,2,'recording four pets does not multiply sample allowance');
+  const second=g.call('register',dogReg({mobile:'09170000999',dog:{profiles:dogProfiles,sampleIndex:0}}));
+  assert.deepEqual(second.ticket.samples.map(s=>s.id),['NC_PUPPY_LAMB']);
+});
+
+test('new pet profiles require every age, dog size, brand and reason; invalid sample target rejected',()=>{
+ const g=fresh();const profile={name:'Pup',age:'PUPPY',size:'SMALL',brand:'Pedigree',reason:'Pet likes it'};
+ for(const key of ['name','age','size','brand','reason'])assert.equal(g.call('register',dogReg({dog:{profiles:[{...profile,[key]:''}]}})).error,'BAD_PET_DETAILS',key);
+ assert.equal(g.call('register',dogReg({dog:{profiles:[profile],sampleIndex:2}})).error,'BAD_PET_DETAILS');
+ assert.equal(g.table('REGISTRATIONS').length,0);
+});
