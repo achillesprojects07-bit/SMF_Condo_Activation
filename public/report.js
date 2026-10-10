@@ -100,7 +100,8 @@
   function csv(name,rows){
     if(!rows.length){alert('No records match these filters.');return;}
     var cols=Object.keys(rows[0]),q=function(v){v=String(v==null?'':v);if(/^[=+\-@]/.test(v))v="'"+v;return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-    var text='\uFEFF'+[cols.join(',')].concat(rows.map(function(r){return cols.map(function(c){return q(r[c]);}).join(',');})).join('\n');
+    var footer=cols.map(function(_,i){return i===0?q('© 2026 Aileen Narciso / Slingshotz Advertising Inc.'):'';}).join(',');
+    var text='\uFEFF'+[cols.join(',')].concat(rows.map(function(r){return cols.map(function(c){return q(r[c]);}).join(',');}),['',footer]).join('\n');
     var a=document.createElement('a'),url=URL.createObjectURL(new Blob([text],{type:'text/csv'}));a.href=url;a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(url);},2000);
   }
   if(token)load();else login();
