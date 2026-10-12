@@ -35,6 +35,80 @@
     return q.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
   }
 
+  function ticketImage(t) {
+    var canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
+    var width = 960, lines = [], y = 48;
+    function wrap(value, font, color) {
+      ctx.font = font;
+      var words = String(value || "").split(/\s+/), line = "";
+      words.forEach(function (word) {
+        var next = line ? line + " " + word : word;
+        if (line && ctx.measureText(next).width > width - 100) { lines.push({ text: line, font: font, color: color }); line = word; }
+        else line = next;
+      });
+      if (line) lines.push({ text: line, font: font, color: color });
+    }
+    canvas.width = width;
+    wrap(t.status === "CLAIMED" ? "FREE PACK RECEIVED" : "FREE NutriChunks / Majesty", "bold 36px sans-serif", "#067647");
+    wrap(t.code, "bold 48px sans-serif", "#1c2733");
+    wrap([t.petNames, t.name].filter(Boolean).join(" • "), "28px sans-serif", "#344054");
+    var headerLines = lines.length;
+    wrap("Applicable variants for your pet(s)", "bold 30px sans-serif", "#0066b3");
+    (t.samples || []).forEach(function (s) { wrap("1 FREE pack — " + s.name, "bold 30px sans-serif", "#067647"); });
+    (t.unavailableSamples || []).forEach(function (s) { wrap(s.name + " — OUT OF STOCK", "bold 28px sans-serif", "#7a2e0e"); });
+    if (t.noStock && !(t.unavailableSamples || []).length) wrap("Some applicable samples are out of stock.", "28px sans-serif", "#7a2e0e");
+    wrap("One 150g pack per applicable variant, regardless of pet count.", "26px sans-serif", "#344054");
+    wrap(t.status === "CLAIMED" ? "This ticket has already been redeemed." : "Present to our Pet Pals to redeem freebie", "bold 30px sans-serif", "#0066b3");
+    wrap("Available while supplies last.", "26px sans-serif", "#344054");
+    wrap((t.condoName || "") + " • " + (t.registeredAt || t.date || ""), "24px sans-serif", "#66717d");
+    wrap("© 2026 Aileen Narciso / Slingshotz Advertising Inc.", "22px sans-serif", "#526171");
+    canvas.height = lines.length * 52 + 540 + 90;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.textAlign = "center"; ctx.textBaseline = "top";
+    var q = qrcode(0, "M"), ids = (t.samples || []).map(function (s) { return s.id; });
+    q.addData("SMFC1|" + t.code + "|" + ids.join(",")); q.make();
+    var count = q.getModuleCount(), scale = Math.floor(500 / (count + 8)), side = (count + 8) * scale, left = Math.floor((width - side) / 2);
+    lines.forEach(function (line, i) {
+      if (i === headerLines) {
+        ctx.fillStyle = "#000";
+        for (var row = 0; row < count; row++) for (var col = 0; col < count; col++) if (q.isDark(row, col)) ctx.fillRect(left + (col + 4) * scale, y + (row + 4) * scale, scale, scale);
+        y += 540;
+      }
+      ctx.fillStyle = line.color; ctx.font = line.font; ctx.fillText(line.text, width / 2, y); y += 52;
+    });
+    return canvas.toDataURL("image/png");
+  }
+
+  function saveTicketImage(t) {
+    var status = $("saveImageStatus");
+    try {
+      var url = ticketImage(t), link = document.createElement("a");
+      link.href = url; link.download = "SMF-Claim-" + String(t.code).replace(/[^A-Za-z0-9-]/g, "") + ".png";
+      document.body.appendChild(link); link.click(); link.remove();
+      $("savedTicketImage").src = url; $("savedTicketPreview").hidden = false;
+      status.textContent = "Your ticket image is ready. Check your downloads, or save the image below.";
+    } catch (e) { status.textContent = "The image could not be saved. Please take a screenshot of your ticket instead."; }
+  }
+
+  // Product claims checked against San Miguel Pet Care variant pages.
+  var productInfo = {
+    NC_PUPPY_LAMB: {image:"products/puppy-lamb.svg", title:"NutriChunks Hi-Protein Puppy", detail:"Lamb flavor • For puppies", features:[
+      ["ActivBoost", "Supports daily energy needs."], ["Prebiotics (MOS)", "Supports gut health and immunity."], ["Omega-3", "Supports puppy vision and learning."], ["Yucca extract", "Helps improve stool quality and reduce odor."]]},
+    NC_MAINT_ADULT: {image:"products/adult-beef.svg", title:"NutriChunks Maintenance Adult", detail:"Beef flavor • For adult dogs", features:[
+      ["ActivBoost", "Supports daily energy needs."], ["Yucca extract", "Helps improve stool quality and reduce odor."], ["Omega-3 & Omega-6", "Supports healthy skin and a shiny coat."]]},
+    NC_SMALL_BREED: {image:"products/small-breed-lamb.svg", title:"NutriChunks Maintenance Small Breeds", detail:"Lamb flavor • For small adult dogs", features:[
+      ["Small kibbles", "Easier to chew and gentle on gums."], ["ActivBoost", "Supports daily energy needs."], ["Yucca extract", "Helps reduce stool odor."], ["Omega-3 & Omega-6", "Supports healthy skin and a shiny coat."]]},
+    MJ_ADULT_SALMON: {image:"products/majesty-salmon.svg", title:"Majesty Adult Salmon", detail:"Salmon flavor • For adult cats", features:[
+      ["Taurine", "Supports heart health and vision."], ["Omega-6", "Supports healthy skin and a shiny coat."], ["Yucca extract", "Helps improve stool quality and reduce odor."], ["Calcium, phosphorus & vitamin D", "Supports strong bones and healthy teeth."]]}
+  };
+  function showApplicableProducts(t) {
+    var available = (t.samples || []).map(function(s) {return s.id;});
+    var samples = (t.samples || []).concat(t.unavailableSamples || []).filter(function(s,i,all) {return all.findIndex(function(x) {return x.id === s.id;}) === i;});
+    $("applicableProducts").innerHTML = samples.map(function(s) {
+      var p = productInfo[s.id]; if (!p) return "";
+      return '<article class="productInfo"><h2>'+esc(p.title)+'</h2><p class="productDetail">'+esc(p.detail)+'</p><img class="productShot" src="'+p.image+'" alt="'+esc(p.title)+' product pack" loading="lazy" decoding="async"><p class="productAllocation">'+(available.indexOf(s.id)>=0?'Your FREE sample: 1 × 150g pack':'Applicable variant — currently OUT OF STOCK')+'</p><h3>Quick features</h3><dl class="productFeatures">'+p.features.map(function(f){return '<div><dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></div>';}).join('')+'</dl></article>';
+    }).join("");
+  }
+
   function showTicket(t) {
     main.innerHTML = $("ticketTpl").innerHTML;
     $("tkCode").textContent = t.code;
@@ -42,9 +116,13 @@
     var ids = (t.samples || []).map(function (s) { return s.id; });
     $("tkQr").innerHTML = qrSvg("SMFC1|" + t.code + "|" + ids.join(","));
     var html = (t.samples || []).map(function (s) { return '<div class="sample ' + ({NC_PUPPY_LAMB:'variant-puppy',NC_MAINT_ADULT:'variant-maintenance',NC_SMALL_BREED:'variant-small',MJ_ADULT_SALMON:'variant-majesty'}[s.id] || '') + '">🎁 <span class="free">FREE</span> ' + esc(s.name) + "</div>"; }).join("");
-    if (t.noStock) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
+    html += (t.unavailableSamples || []).map(function (s) { return '<div class="sample none">' + esc(s.name) + ' — OUT OF STOCK</div>'; }).join("");
+    if (t.noStock && !(t.unavailableSamples || []).length) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
     $("tkMeta").textContent = (t.condoName || "") + " • " + (t.registeredAt || t.date || "");
+    $("saveImage").onclick = function () { saveTicketImage(t); };
+    showApplicableProducts(t);
+    if (t.status === "CLAIMED") main.querySelector(".redeemPrompt").textContent = "Your freebie has already been redeemed.";
     var box = main.querySelector(".ticket");
     if (t.status === "CLAIMED") {
       box.classList.add("claimed");

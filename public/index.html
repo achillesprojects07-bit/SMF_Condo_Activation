@@ -95,15 +95,21 @@
 
 <template id="ticketTpl">
   <div class="ticket">
-    <div class="tkTop">Take a screenshot of this QR code and show it to our NutriChunks &amp; Majesty Pet Pals</div>
+    <div class="tkTop">Your FREE sample claim ticket</div>
     <div class="tkCode" id="tkCode"></div>
     <div class="tkPets" id="tkPets"></div>
     <div class="tkQr" id="tkQr"></div>
+    <div class="tkVariantTitle">Applicable variants for your pet(s)</div>
     <div class="tkSamples" id="tkSamples"></div>
+    <div class="helper">One 150g pack per applicable variant, regardless of pet count.</div>
     <div class="tkMeta" id="tkMeta"></div>
   </div>
-  <div class="helper center">Please keep this page open until you receive your free pack.</div>
+  <button id="saveImage" type="button" class="btn saveImage">SAVE IMAGE</button>
+  <div class="redeemPrompt center">Present to our Pet Pals to redeem freebie</div>
+  <div id="saveImageStatus" class="helper center" role="status" aria-live="polite"></div>
+  <div id="savedTicketPreview" hidden><p class="helper center">If the image did not download, touch and hold it below, then choose Save Image / Save to Photos.</p><img id="savedTicketImage" class="photoPrev" alt="Your claim ticket with QR code and applicable sample variants"></div>
   <div class="heroNote center" style="margin-top:10px"><b>NOTE:</b> Available while supplies last.</div>
+  <section id="applicableProducts" class="applicableProducts" aria-label="Your applicable products and quick features"></section>
 </template>
 
 <script src="vendor/qrcode.js"></script>

@@ -118,3 +118,24 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .brandmark,.pill{flex-shrink:0}
 .codeRow input{min-width:0}
 @media(max-width:360px){.top{padding:12px;gap:8px}.brandmark{width:44px}.content{padding-left:12px;padding-right:12px}.codeRow .btn{padding:0 12px;font-size:16px}}
+
+/* Resident claim ticket actions */
+.btn.saveImage{background:#067647;color:#fff;font-size:22px;min-height:60px;margin-top:18px;border:2px solid #055c37}
+.btn.saveImage:focus-visible{outline:3px solid #0066b3;outline-offset:3px}
+.redeemPrompt{font-size:17px;font-weight:800;color:#0066b3;margin-top:10px;line-height:1.4}
+.tkVariantTitle{font-size:16px;font-weight:800;color:#344054;margin:16px 0 8px}
+.tkCode{font-size:clamp(28px,8vw,48px);overflow-wrap:anywhere}
+
+/* Large isolated product packs with readable feature text. */
+.applicableProducts{margin-top:28px}
+.productInfo{padding:24px 0;border-top:1px solid #d0d5dd;text-align:left}
+.productInfo h2{font-size:24px;line-height:1.3;margin:0 0 8px;color:#1c2733;overflow-wrap:anywhere}
+.productDetail{font-size:17px;line-height:1.4;margin:0;color:#475467}
+.productShot{display:block;width:100%;height:360px;object-fit:contain;margin:18px auto;background:transparent}
+.productAllocation{font-size:18px;font-weight:800;line-height:1.4;color:#067647;margin:12px 0 20px}
+.productInfo h3{font-size:20px;margin:0 0 10px}
+.productFeatures{margin:0;font-size:17px;line-height:1.5}
+.productFeatures>div{padding:12px 0;border-bottom:1px solid #e8edf2}
+.productFeatures dt{font-weight:850;color:#1c2733}
+.productFeatures dd{margin:3px 0 0;color:#344054}
+@media(max-width:360px){.productShot{height:310px}.productInfo h2{font-size:22px}}
