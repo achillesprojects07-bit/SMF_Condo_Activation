@@ -191,6 +191,16 @@ function runningToday_(condoId, date) {
 
 function products_() { return read_('PRODUCTS'); }
 
+// Future events open registration only when their schedule explicitly opts in.
+function registrationEvent_(condoId) {
+  var today = today_();
+  if (runningToday_(condoId, today)) return {date:today, advance:false};
+  var upcoming = read_('SCHEDULE').filter(function(s) {
+    return String(s.CONDO_ID).toUpperCase() === String(condoId).toUpperCase() && s.DATE > today && String(s.PREREG_OPEN || '').toUpperCase() === 'YES';
+  }).sort(function(a,b) { return a.DATE.localeCompare(b.DATE); });
+  return upcoming.length ? {date:upcoming[0].DATE, advance:true} : null;
+}
+
 /** Stock picture for one condo on one date. reserved = tickets not yet claimed. */
 function stockFor_(condoId, date, regs) {
   var out = {};
@@ -236,11 +246,11 @@ function nextClaimCode_(condo, regs) {
 function condoInfo_(p) {
   var condo = findCondo_(p.condoId);
   if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'We could not find this condo. Please scan the QR code at the booth again.' };
-  var date = today_();
+  var date = today_(), event = registrationEvent_(condo.CONDO_ID);
   var brands = read_('BRANDS').filter(function (b) { return String(b.STATUS || 'ACTIVE').toUpperCase() !== 'INACTIVE'; })
     .map(function (b) { return { brand: b.BRAND, petType: b.PET_TYPE.toUpperCase() }; });
   return {
-    ok: true, date: date, running: runningToday_(condo.CONDO_ID, date),
+    ok: true, date: date, running: runningToday_(condo.CONDO_ID, date), registrationOpen:!!event, eventDate:event ? event.date : '', preregistration:!!(event && event.advance),
     condo: { id: condo.CONDO_ID, name: condo.CONDO_NAME, booth: condo.BOOTH_LOCATION },
     products: products_().map(function (x) { return { id: x.PRODUCT_ID, name: x.PRODUCT_NAME, petType: x.PET_TYPE }; }),
     brands: brands
@@ -259,8 +269,9 @@ function register_(p) {
   ensureColumns_('REGISTRATIONS');
   var condo = findCondo_(p.condoId);
   if (!condo) return { ok: false, error: 'CONDO_NOT_FOUND', message: 'We could not find this condo. Please scan the QR code at the booth again.' };
-  var date = today_();
-  if (!runningToday_(condo.CONDO_ID, date)) return { ok: false, error: 'NOT_TODAY', message: 'There is no sampling at this condo today.' };
+  var event = registrationEvent_(condo.CONDO_ID);
+  if (!event) return { ok: false, error: 'NOT_TODAY', message: 'There is no sampling or open pre-registration at this condo today.' };
+  var date = event.date;
   if (p.consent !== 'YES') return { ok: false, error: 'NO_CONSENT', message: 'Your privacy consent is needed to receive your free pack.' };
   var mobile = normMobile_(p.mobile);
   if (!/^09\d{9}$/.test(mobile)) return { ok: false, error: 'BAD_MOBILE', message: 'Please enter a valid mobile number (e.g. 09171234567).' };
@@ -289,7 +300,9 @@ function register_(p) {
     addVariant(String(x.age || '').toUpperCase() === 'PUPPY' ? 'NC_PUPPY_LAMB' : String(x.size || '').toUpperCase() === 'SMALL' ? 'NC_SMALL_BREED' : 'NC_MAINT_ADULT');
   });
   if (hasCat) addVariant('MJ_ADULT_SALMON');
-  var samples = eligible.filter(function (id) { return stock[id] && stock[id].free > 0; });
+  // Advance registration records applicable variants, not a guaranteed stock reservation.
+  // Actual available stock is checked by the BA when releasing samples on event day.
+  var samples = event.advance ? eligible.slice() : eligible.filter(function (id) { return stock[id] && stock[id].free > 0; });
   var unavailable = eligible.filter(function (id) { return samples.indexOf(id) < 0; });
   var sampleDog = samples.filter(function (id) { return /^NC_/.test(id); })[0] || (hasDog ? 'NONE' : '');
   var sampleCat = samples.indexOf('MJ_ADULT_SALMON') >= 0 ? 'MJ_ADULT_SALMON' : (hasCat ? 'NONE' : '');
@@ -316,7 +329,7 @@ function register_(p) {
     CAT_COUNT: hasCat ? Number(cat.count) || 1 : '', CAT_NAMES: hasCat ? String(cat.names || '').slice(0, 2000) : '',
     CAT_AGE: hasCat ? String(cat.age || '') : '', CAT_BRAND: hasCat ? String(cat.brand || '').slice(0, 3000) : '',
     DOG_PROFILES: hasDog && dog.profiles ? JSON.stringify(dog.profiles) : '', CAT_PROFILES: hasCat && cat.profiles ? JSON.stringify(cat.profiles) : '', DOG_BRAND_REASON: hasDog ? String(dog.reason||'') : '', CAT_BRAND_REASON: hasCat ? String(cat.reason||'') : '',
-    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, SAMPLE_PRODUCTS: samples.join(', '), UNAVAILABLE_SAMPLES: unavailable.join(', '), STATUS: gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
+    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, SAMPLE_PRODUCTS: samples.join(', '), UNAVAILABLE_SAMPLES: unavailable.join(', '), STATUS: event.advance ? 'PRE_REGISTERED' : gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
   };
   append_('REGISTRATIONS', row);
   return { ok: true, ticket: ticketView_(row, condo) };
@@ -337,12 +350,13 @@ function unavailableSamples_(r) {
 }
 
 function ticketView_(r, condo) {
+  condo = condo || findCondo_(r.CONDO_ID);
   var names = {};
   products_().forEach(function (x) { names[x.PRODUCT_ID] = x.PRODUCT_NAME; });
   var samples = assignedSamples_(r), stock = stockFor_(r.CONDO_ID, r.DATE), unavailable = unavailableSamples_(r);
   return {
     code: r.CLAIM_CODE, date: r.DATE, registeredAt: r.REGISTERED_AT, status: r.STATUS,
-    condoId: r.CONDO_ID, condoName: (condo && condo.CONDO_NAME) || r.CONDO_NAME,
+    condoId: r.CONDO_ID, condoName: (condo && condo.CONDO_NAME) || r.CONDO_NAME, booth:condo ? condo.BOOTH_LOCATION || '' : '',
     name: r.RESIDENT_NAME, petType: r.PET_TYPE,
     petNames: [r.DOG_NAMES, r.CAT_NAMES].filter(String).join(', '),
     samples: samples.map(function (id) { return { id: id, name: names[id] || id, stockLeft: stock[id] ? Math.max(0, stock[id].left) : 0 }; }),
@@ -403,6 +417,7 @@ function redeem_(p) {
   var regs = read_('REGISTRATIONS'), reg = findReg_(p.code, regs);
   if (reg && p.condoId && String(p.condoId).toUpperCase() !== reg.CONDO_ID.toUpperCase()) return {ok:false,error:'WRONG_ASSIGNMENT',message:'Gamitin ang ticket para sa iyong assigned condo.'};
   if (reg && trainingStaff_(p.staffCode) !== trainingRow_(reg)) return { ok: false, error: 'WRONG_ASSIGNMENT', message: 'Gamitin ang ticket para sa iyong assigned condo. Training accounts use TRAIN tickets.' };
+  if (reg && !trainingRow_(reg) && reg.DATE > today_()) return {ok:false,error:'CLAIM_DATE',message:'Sa '+reg.DATE+' pa puwedeng i-claim ang ticket na ito.'};
   var products = {};
   products_().forEach(function (x) { products[x.PRODUCT_ID] = x; });
   var given = (p.products || []).filter(function (id, i, all) { return products[id] && all.indexOf(id) === i; });
@@ -461,7 +476,7 @@ function status_(p) {
     ok: true, date: date,
     registered: mine.length,
     claimed: mine.filter(function (r) { return r.STATUS === 'CLAIMED'; }).length,
-    waiting: mine.filter(function (r) { return r.STATUS === 'WAITING'; }).length,
+    waiting: mine.filter(function (r) { return r.STATUS === 'WAITING' || r.STATUS === 'PRE_REGISTERED'; }).length,
     stock: products_().map(function (x) { var s = stock[x.PRODUCT_ID]; return { id: x.PRODUCT_ID, name: x.PRODUCT_NAME, allocated: s.allocated, given: s.given, left: s.left }; })
   };
 }

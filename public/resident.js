@@ -20,6 +20,13 @@
   }
   function loadTicket() { try { return JSON.parse(localStorage.getItem(TICKET_KEY) || "null"); } catch (e) { return null; } }
   function saveTicket(t) { try { localStorage.setItem(TICKET_KEY, JSON.stringify(t)); } catch (e) { } }
+  function eventDateLabel(date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return '';
+    return new Date(date+'T00:00:00+08:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'Asia/Manila'}).toUpperCase();
+  }
+  function claimNote(t) {
+    return 'Claim on '+eventDateLabel(t.date)+(t.booth ? ' at '+t.booth+', '+t.condoName : ' at '+t.condoName+'. Exact booth location to be announced.');
+  }
 
   async function api(path, opts) {
     var res = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, opts || {}));
@@ -60,6 +67,7 @@
     wrap("One 150g pack per applicable variant, regardless of pet count.", "26px sans-serif", "#344054");
     wrap(t.status === "CLAIMED" ? "This ticket has already been redeemed." : "Present to our Pet Pals to redeem freebie", "bold 30px sans-serif", "#0066b3");
     wrap("Available while supplies last.", "26px sans-serif", "#344054");
+    if (t.status !== 'CLAIMED' && eventDateLabel(t.date)) wrap(claimNote(t), "bold 28px sans-serif", "#0066b3");
     wrap((t.condoName || "") + " • " + (t.registeredAt || t.date || ""), "24px sans-serif", "#66717d");
     wrap("© 2026 Aileen Narciso / Slingshotz Advertising Inc.", "22px sans-serif", "#526171");
     canvas.height = lines.length * 52 + 540 + 90;
@@ -75,18 +83,33 @@
       }
       ctx.fillStyle = line.color; ctx.font = line.font; ctx.fillText(line.text, width / 2, y); y += 52;
     });
-    return canvas.toDataURL("image/png");
+    return canvas;
   }
 
-  function saveTicketImage(t) {
+  function ticketProducts(t) {
+    return (t.samples || []).concat(t.unavailableSamples || []).filter(function(s,i,all){return productInfo[s.id] && all.findIndex(function(x){return x.id===s.id;})===i;});
+  }
+  async function ticketWithProductShots(t) {
+    var ticket=ticketImage(t), products=ticketProducts(t);
+    var images=await Promise.all(products.map(function(s){return new Promise(function(resolve,reject){var img=new Image();img.onload=function(){resolve(img);};img.onerror=function(){reject(new Error('Product image could not load'));};img.src=productInfo[s.id].image;});}));
+    if (!products.length) return ticket.toDataURL('image/png');
+    var result=document.createElement('canvas');result.width=ticket.width;result.height=ticket.height+90+Math.ceil(products.length/2)*460;
+    var ctx=result.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,result.width,result.height);ctx.drawImage(ticket,0,0);
+    ctx.textAlign='center';ctx.fillStyle='#043765';ctx.font='bold 30px sans-serif';ctx.fillText('Your applicable products for future reference',480,ticket.height+47);
+    products.forEach(function(s,i){var img=images[i],left=(i%2)*480,top=ticket.height+80+Math.floor(i/2)*460,scale=Math.min(410/img.naturalWidth,350/img.naturalHeight),w=img.naturalWidth*scale,h=img.naturalHeight*scale;ctx.drawImage(img,left+(480-w)/2,top,w,h);ctx.font='bold 22px sans-serif';var title=productInfo[s.id].title,words=title.split(' '),line='',lines=[];words.forEach(function(word){var next=line?line+' '+word:word;if(line&&ctx.measureText(next).width>430){lines.push(line);line=word;}else line=next;});if(line)lines.push(line);lines.forEach(function(line,j){ctx.fillText(line,left+240,top+380+j*28);});});
+    return result.toDataURL('image/png');
+  }
+  async function saveTicketImage(t) {
     var status = $("saveImageStatus");
+    var button=$('saveImage');button.disabled=true;status.textContent='Preparing your ticket and product shots…';
     try {
-      var url = ticketImage(t), link = document.createElement("a");
+      var url = await ticketWithProductShots(t), link = document.createElement("a");
       link.href = url; link.download = "SMF-Claim-" + String(t.code).replace(/[^A-Za-z0-9-]/g, "") + ".png";
       document.body.appendChild(link); link.click(); link.remove();
       $("savedTicketImage").src = url; $("savedTicketPreview").hidden = false;
-      status.textContent = "Your ticket image is ready. Check your downloads, or save the image below.";
+      status.textContent = "Your QR ticket and product shots are ready. Check your downloads, or touch and hold the image below to save it to Photos / Gallery.";
     } catch (e) { status.textContent = "The image could not be saved. Please take a screenshot of your ticket instead."; }
+    finally {button.disabled=false;}
   }
 
   // Product claims checked against San Miguel Pet Care variant pages.
@@ -100,13 +123,19 @@
     MJ_ADULT_SALMON: {image:"products/majesty-salmon.svg", title:"Majesty Adult Salmon", detail:"Salmon flavor • For adult cats", features:[
       ["Taurine", "Supports heart health and vision."], ["Omega-6", "Supports healthy skin and a shiny coat."], ["Yucca extract", "Helps improve stool quality and reduce odor."], ["Calcium, phosphorus & vitamin D", "Supports strong bones and healthy teeth."]]}
   };
-  function showApplicableProducts(t) {
+  function showApplicableProducts(t, features) {
     var available = (t.samples || []).map(function(s) {return s.id;});
     var samples = (t.samples || []).concat(t.unavailableSamples || []).filter(function(s,i,all) {return all.findIndex(function(x) {return x.id === s.id;}) === i;});
     $("applicableProducts").innerHTML = samples.map(function(s) {
       var p = productInfo[s.id]; if (!p) return "";
-      return '<article class="productInfo"><h2>'+esc(p.title)+'</h2><p class="productDetail">'+esc(p.detail)+'</p><img class="productShot" src="'+p.image+'" alt="'+esc(p.title)+' product pack" loading="lazy" decoding="async"><p class="productAllocation">'+(available.indexOf(s.id)>=0?'Your FREE sample: 1 × 150g pack':'Applicable variant — currently OUT OF STOCK')+'</p><h3>Quick features</h3><dl class="productFeatures">'+p.features.map(function(f){return '<div><dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></div>';}).join('')+'</dl></article>';
+      return '<article class="productInfo"><h2>'+esc(p.title)+'</h2><p class="productDetail">'+esc(p.detail)+'</p><img class="productShot" src="'+p.image+'" alt="'+esc(p.title)+' product pack" loading="lazy" decoding="async"><p class="productAllocation">'+(available.indexOf(s.id)>=0?'Your applicable sample: 1 × 150g pack':'Applicable variant — currently OUT OF STOCK')+'</p>'+(features===false?'':'<h3>Quick features</h3><dl class="productFeatures">'+p.features.map(function(f){return '<div><dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></div>';}).join('')+'</dl>')+'</article>';
     }).join("");
+  }
+
+  function showRecommendations(t) {
+    main.innerHTML='<section><h1>Your pet’s recommended variants</h1><p>Explore the key features, then open and save your claim ticket.</p><section id="applicableProducts" class="applicableProducts" aria-label="Your applicable products and quick features"></section><button type="button" id="viewTicket" class="btn saveImage">VIEW MY QR TICKET</button></section>';
+    showApplicableProducts(t,true);
+    $('viewTicket').onclick=function(){window.scrollTo(0,0);showTicket(t);};
   }
 
   function showTicket(t) {
@@ -120,8 +149,10 @@
     if (t.noStock && !(t.unavailableSamples || []).length) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
     $("tkMeta").textContent = (t.condoName || "") + " • " + (t.registeredAt || t.date || "");
+    if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     $("saveImage").onclick = function () { saveTicketImage(t); };
-    showApplicableProducts(t);
+    showApplicableProducts(t,false);
+    $('viewFeatures').onclick=function(){window.scrollTo(0,0);showRecommendations(t);};
     if (t.status === "CLAIMED") main.querySelector(".redeemPrompt").textContent = "Your freebie has already been redeemed.";
     var box = main.querySelector(".ticket");
     if (t.status === "CLAIMED") {
@@ -271,7 +302,7 @@
       r.ticket.regId = regId;
       saveTicket(r.ticket);
       window.scrollTo(0, 0);
-      showTicket(r.ticket);
+      showRecommendations(r.ticket);
       return;
     }
     btn.disabled = false; btn.textContent = "Get my FREE NutriChunks / Majesty";
@@ -287,8 +318,9 @@
     catch (e) { info = { ok: false, message: "No internet connection. Please try again when you have signal." }; }
     if (!info.ok) { main.innerHTML = '<div class="errbox">' + esc(info.message || "Something went wrong. Please try again.") + "</div>"; return; }
     $("condoLine").textContent = info.condo.name;
-    if (!info.running) { main.innerHTML = '<div class="warnbox">' + esc(info.condo.name) + ": there is no sampling today. We hope to see you at our next visit!</div>"; return; }
+    if (!info.running && !info.registrationOpen) { main.innerHTML = '<div class="warnbox">' + esc(info.condo.name) + ": there is no sampling today. We hope to see you at our next visit!</div>"; return; }
     buildForm();
+    if(info.preregistration){var notice=document.createElement('p');notice.className='warnbox';notice.textContent='Pre-register now. Claim on '+eventDateLabel(info.eventDate)+' at '+info.condo.name+'. '+(info.condo.booth?'Booth: '+info.condo.booth:'Exact booth location to be announced.');main.prepend(notice);}
   }
 
   start();

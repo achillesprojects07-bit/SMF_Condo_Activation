@@ -100,7 +100,7 @@ export function buildReport(raw) {
     x.dogs += Number(r.DOG_COUNT) || 0; x.cats += Number(r.CAT_COUNT) || 0;
     if (r.PROMO_OPT_IN === "YES") x.promoOptIn++;
     if (r.STATUS === "CLAIMED") { x.claimed++; for (const id of String(r.SAMPLES_GIVEN || "").split(",").map(s => s.trim()).filter(Boolean)) x.given[id] = (x.given[id] || 0) + 1; }
-    else if (r.STATUS === "WAITING") x.waiting++;
+    else if (r.STATUS === "WAITING" || r.STATUS === "PRE_REGISTERED") x.waiting++;
     else if (r.STATUS === "NO_STOCK") x.noStock++;
     for (const pet of ['DOG','CAT']) {
       let profiles=[];try{profiles=JSON.parse(r[pet+'_PROFILES']||'[]');}catch{}

@@ -28,7 +28,7 @@
   function petDetails(r,pet) {return petProfiles(r,pet).map(function(p){return p.name+': '+p.age+(p.size?' / '+p.size:'')+'; Food: '+p.brand+'; Reason: '+p.reason;}).join(' | ');}
   function petPhotos(r) {return ['DOG','CAT'].map(function(pet){return petProfiles(r,pet).map(function(p,i){return '<div><dt>'+esc(p.name||pet+' '+(i+1))+' photo</dt><dd>'+photo(p.photoUrl,'View pet photo')+'</dd></div>';}).join('');}).join('');}
   function kpi(value,label,note,color) { return '<div class="metric '+color+'"><span>'+esc(label)+'</span><strong>'+num(value)+'</strong><small>'+esc(note)+'</small></div>'; }
-  function status(r) { return r.STATUS==='CLAIMED'?'Sample received':r.STATUS==='WAITING'?'Awaiting collection':r.STATUS==='NO_STOCK'?'No sample available':r.STATUS||'Unknown'; }
+  function status(r) { return r.STATUS==='CLAIMED'?'Sample received':r.STATUS==='PRE_REGISTERED'?'Pre-registered':r.STATUS==='WAITING'?'Awaiting collection':r.STATUS==='NO_STOCK'?'No sample available':r.STATUS||'Unknown'; }
   function match(date,condo) { return (filter==='ALL'||date===filter)&&(condoFilter==='ALL'||condo===condoFilter); }
   function photo(url,label) { return /^https:\/\//i.test(url||'') ? '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(label)+'</a>' : '—'; }
   try { token = sessionStorage.getItem(KEY); } catch(e) {}
@@ -56,7 +56,7 @@
     var flags=(data.flags||[]).filter(function(r){return match(r.DATE,r.CONDO_ID);});
     var pids=Object.keys(data.products||{}), dates=Array.from(new Set((data.days||[]).map(function(d){return d.date;}))).sort();
     var condos={};(data.days||[]).forEach(function(d){condos[d.condoId]=d.condoName;});
-    var claimed=regs.filter(function(r){return r.STATUS==='CLAIMED';}), waiting=regs.filter(function(r){return r.STATUS==='WAITING';}).length;
+    var claimed=regs.filter(function(r){return r.STATUS==='CLAIMED';}), waiting=regs.filter(function(r){return r.STATUS==='WAITING'||r.STATUS==='PRE_REGISTERED';}).length;
     var given=sum(days,function(d){return sum(pids,function(p){return d.given[p];});});
     var h='<div class="dashboard-heading"><div><div class="eyebrow">CONDOMINIUM SAMPLING</div><h1>Program performance</h1><p>Resident registrations and free sample distribution.</p></div><button class="btn secondary" id="refresh" type="button">Refresh data</button></div>';
     h+='<div class="filterbar"><label for="day">Date<select id="day"><option value="ALL">All dates</option>'+dates.map(function(d){return '<option value="'+esc(d)+'"'+(d===filter?' selected':'')+'>'+dateLabel(d)+'</option>';}).join('')+'</select></label><label for="condo">Condominium<select id="condo"><option value="ALL">All condominiums</option>'+Object.keys(condos).map(function(c){return '<option value="'+esc(c)+'"'+(c===condoFilter?' selected':'')+'>'+esc(condos[c])+'</option>';}).join('')+'</select></label><span class="scope-note">Live program records only · Training excluded</span></div>';

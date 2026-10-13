@@ -5,6 +5,35 @@ const { loadGateway } = require("./fake-apps-script.cjs");
 function fresh() { const g = loadGateway(); g.setSetting("TEST_MODE", "NO"); return g; }
 const dogReg = (over = {}) => Object.assign({ condoId: "RR", consent: "YES", promoOptIn: "YES", name: "Ana Cruz", mobile: "09171234567", petType: "DOG", dog: { names: "Choco", count: 1, age: "ADULT", size: "SMALL", brand: "Pedigree" } }, over);
 
+function preregGateway() {
+  const g=fresh();g.setNow('2026-10-13T02:00:00Z');
+  g.sheets.get('CONDOS').appendRow(['MR','Mirea Residences','Pasig','','MR','ACTIVE']);
+  const schedule=g.sheets.get('SCHEDULE');schedule.rows[0].push('PREREG_OPEN');schedule.appendRow(['2026-10-17','MR','','09:00','17:00','YES']);
+  return g;
+}
+test('advance registration uses event date and applicable variants without inventing stock',()=>{
+  const g=preregGateway();const info=g.call('condo',{condoId:'MR'});
+  assert.equal(info.running,false);assert.equal(info.registrationOpen,true);assert.equal(info.eventDate,'2026-10-17');
+  const r=g.call('register',dogReg({condoId:'MR',petType:'BOTH',cat:{names:'Ming',age:'ADULT',brand:'Whiskas'}}));
+  assert.equal(r.ok,true);assert.equal(r.ticket.date,'2026-10-17');assert.equal(r.ticket.status,'PRE_REGISTERED');assert.equal(r.ticket.booth,'');
+  assert.deepEqual(r.ticket.samples.map(s=>s.id),['NC_SMALL_BREED','MJ_ADULT_SALMON']);assert.equal(r.ticket.noStock,false);
+  assert.match(g.table('REGISTRATIONS')[0].REGISTERED_AT,/2026-10-13/);assert.equal(g.table('STOCK').some(s=>s.CONDO_ID==='MR'),false);
+  g.ctx.update_('CONDOS',4,{BOOTH_LOCATION:'Clubhouse'});
+  assert.equal(g.call('ticket',{code:r.ticket.code,regId:g.table('REGISTRATIONS')[0].REG_ID,requireReg:true}).ticket.booth,'Clubhouse');
+});
+test('future pre-registration must be explicitly enabled',()=>{
+  const g=preregGateway();g.sheets.get('SCHEDULE').rows.at(-1)[5]='NO';
+  assert.equal(g.call('condo',{condoId:'MR'}).registrationOpen,false);assert.equal(g.call('register',dogReg({condoId:'MR'})).error,'NOT_TODAY');
+});
+test('advance ticket cannot release early and releases with real stock on event day',()=>{
+  const g=preregGateway(),ticket=g.call('register',dogReg({condoId:'MR'})).ticket;
+  const payload={redemptionId:'prereg-release',code:ticket.code,condoId:'MR',staffCode:'PM01',products:['NC_SMALL_BREED']};
+  assert.equal(g.call('redeem',payload).error,'CLAIM_DATE');assert.equal(g.table('REDEMPTIONS').length,0);
+  g.setNow('2026-10-17T02:00:00Z');g.sheets.get('STOCK').appendRow(['2026-10-17','MR','NC_SMALL_BREED',10]);
+  assert.equal(g.call('status',{condoId:'MR'}).waiting,1);
+  assert.equal(g.call('redeem',payload).result,'OK');assert.equal(g.table('REGISTRATIONS')[0].STATUS,'CLAIMED');
+});
+
 test("wrong secret is refused", () => {
   const g = fresh();
   const r = g.post({ secret: "nope", action: "health" });
