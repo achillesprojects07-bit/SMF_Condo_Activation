@@ -69,7 +69,7 @@
     wrap("Available while supplies last.", "26px sans-serif", "#344054");
     if (t.status !== 'CLAIMED' && eventDateLabel(t.date)) wrap(claimNote(t), "bold 28px sans-serif", "#0066b3");
     wrap((t.condoName || "") + " • " + (t.registeredAt || t.date || ""), "24px sans-serif", "#66717d");
-    wrap("© 2026 Aileen Narciso / Slingshotz Advertising Inc.", "22px sans-serif", "#526171");
+    wrap("© 2026 Slingshotz Advertising Inc.", "22px sans-serif", "#526171");
     canvas.height = lines.length * 52 + 540 + 90;
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.textAlign = "center"; ctx.textBaseline = "top";
     var q = qrcode(0, "M"), ids = (t.samples || []).map(function (s) { return s.id; });
@@ -236,7 +236,7 @@
     brandFont(ctx, 28, 700); wrapText(ctx, t.status === "CLAIMED" ? "This ticket has already been redeemed." : "Show this QR code to our NutriChunks & Majesty Pet Pals.", inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.ink; ctx.fillText(l, W / 2, y); } y += 40; });
     brandFont(ctx, 25, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText("Available while supplies last. One free pack per mobile number.", W / 2, y); } y += 38;
     brandFont(ctx, 21, 400); if (draw) { ctx.fillStyle = "#98a2b3"; ctx.fillText((t.condoName || "") + " • Registered " + registeredLabel(t), W / 2, y); } y += 32;
-    if (draw) ctx.fillText("© 2026 Aileen Narciso / Slingshotz Advertising Inc.", W / 2, y); y += 34;
+    if (draw) ctx.fillText("© 2026 Slingshotz Advertising Inc.", W / 2, y); y += 34;
     return y + 46;
   }
 
@@ -251,17 +251,43 @@
     drawBrandedTicket(ctx, t, W, logo, shots, true);
     return cv.toDataURL("image/png");
   }
-  async function saveTicketImage(t) {
-    var status = $("saveImageStatus");
-    var button=$('saveImage');button.disabled=true;status.textContent='Preparing your ticket, product shots and nearby stores…';
+  function prepareTicketImage(t) {
+    var button = $('saveImage'), status = $('saveImageStatus');
+    button.disabled = true;
+    status.textContent = 'Preparing your ticket image…';
+    ticketWithProductShots(t).then(function(url) {
+      if ($('saveImage') !== button) return;
+      $('savedTicketImage').src = url;
+      var raw = atob(url.split(',')[1]), bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      var file = typeof File === 'function' ? new File([bytes], 'SMF-Claim-' + String(t.code).replace(/[^A-Za-z0-9-]/g, '') + '.png', {type:'image/png'}) : null;
+      button.onclick = function() { saveTicketImage(file); };
+      button.disabled = false;
+      status.textContent = 'Tap SAVE IMAGE, then choose Save Image / Photos if offered. You can also touch and hold the ticket image to save it.';
+    }).catch(function() {
+      if ($('saveImage') !== button) return;
+      status.textContent = 'The image could not be prepared. Tap to try again, or take a screenshot of your ticket.';
+      button.disabled = false;
+      button.onclick = function() { prepareTicketImage(t); };
+    });
+  }
+  async function saveTicketImage(file) {
+    var status = $('saveImageStatus'), preview = $('savedTicketPreview');
+    preview.hidden = false;
     try {
-      var url = await ticketWithProductShots(t), link = document.createElement("a");
-      link.href = url; link.download = "SMF-Claim-" + String(t.code).replace(/[^A-Za-z0-9-]/g, "") + ".png";
-      document.body.appendChild(link); link.click(); link.remove();
-      $("savedTicketImage").src = url; $("savedTicketPreview").hidden = false;
-      status.textContent = "Your QR ticket, product shots and nearby stores are ready. Check your downloads, or touch and hold the image below to save it to Photos / Gallery.";
-    } catch (e) { if (window.console) console.error("saveTicketImage", e); status.textContent = "The image could not be saved. Please take a screenshot of your ticket instead."; }
-    finally {button.disabled=false;}
+      // Prepared before the tap so the native share sheet retains user activation.
+      if (file && navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+        await navigator.share({files:[file]});
+        status.textContent = 'If you chose Save Image / Photos, check your gallery. Otherwise, touch and hold the image below for saving options.';
+        return;
+      }
+    } catch (e) {
+      status.textContent = e.name === 'AbortError' ? 'Save menu closed. You can try again or touch and hold the image below.' : 'Touch and hold the image below, then choose the available image-saving option.';
+      preview.scrollIntoView({behavior:'smooth', block:'start'});
+      return;
+    }
+    status.textContent = 'Touch and hold the image below and choose Save Image / Save to Photos if offered. On a computer, right-click to save. Saving options depend on your browser.';
+    preview.scrollIntoView({behavior:'smooth', block:'start'});
   }
 
   // Product claims checked against San Miguel Pet Care variant pages.
@@ -275,12 +301,19 @@
     MJ_ADULT_SALMON: {image:"products/majesty-salmon.svg", title:"Majesty Adult Salmon", detail:"Salmon flavor • For adult cats", features:[
       ["Taurine", "Supports heart health and vision."], ["Omega-6", "Supports healthy skin and a shiny coat."], ["Yucca extract", "Helps improve stool quality and reduce odor."], ["Calcium, phosphorus & vitamin D", "Supports strong bones and healthy teeth."]]}
   };
+  function variantStores(t, id) {
+    var stores = (t.stores || []).filter(function(st) { return (st.has || []).indexOf(id) >= 0; });
+    if (!stores.length) return '';
+    return '<div class="variantStores"><h3>Where to buy near '+esc(t.condoName || 'you')+'</h3><ul>'+stores.map(function(st) {
+      return '<li>'+esc(st.name)+'</li>';
+    }).join('')+'</ul></div>';
+  }
   function showApplicableProducts(t, features) {
     var available = (t.samples || []).map(function(s) {return s.id;});
     var samples = (t.samples || []).concat(t.unavailableSamples || []).filter(function(s,i,all) {return all.findIndex(function(x) {return x.id === s.id;}) === i;});
     $("applicableProducts").innerHTML = samples.map(function(s) {
       var p = productInfo[s.id]; if (!p) return "";
-      return '<article class="productInfo"><h2>'+esc(p.title)+'</h2><p class="productDetail">'+esc(p.detail)+'</p><img class="productShot" src="'+p.image+'" alt="'+esc(p.title)+' product pack" loading="lazy" decoding="async"><p class="productAllocation">'+(available.indexOf(s.id)>=0?'Your applicable sample: 1 × 150g pack':'Applicable variant — currently OUT OF STOCK')+'</p>'+(features===false?'':'<h3>Quick features</h3><dl class="productFeatures">'+p.features.map(function(f){return '<div><dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></div>';}).join('')+'</dl>')+'</article>';
+      return '<article class="productInfo"><h2>'+esc(p.title)+'</h2><p class="productDetail">'+esc(p.detail)+'</p><img class="productShot" src="'+p.image+'" alt="'+esc(p.title)+' product pack" loading="lazy" decoding="async"><p class="productAllocation">'+(available.indexOf(s.id)>=0?'Your applicable sample: 1 × 150g pack':'Applicable variant — currently OUT OF STOCK')+'</p>'+(features===false?'':'<h3>Quick features</h3><dl class="productFeatures">'+p.features.map(function(f){return '<div><dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></div>';}).join('')+'</dl>')+variantStores(t,s.id)+'</article>';
     }).join("");
   }
 
@@ -302,7 +335,7 @@
     $("tkSamples").innerHTML = html;
     $("tkMeta").textContent = (t.condoName || "") + " • Registered " + registeredLabel(t);
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
-    $("saveImage").onclick = function () { saveTicketImage(t); };
+    prepareTicketImage(t);
     showApplicableProducts(t,false);
     renderStores(t);
     $('viewFeatures').onclick=function(){window.scrollTo(0,0);showRecommendations(t);};

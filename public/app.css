@@ -160,3 +160,5 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 
 .tkTop.tkBrand{font-size:clamp(15px,5.4vw,24px);font-weight:900;line-height:1.15;color:var(--ink);white-space:nowrap}
 .tkBrand .tkOr{color:var(--ink)}
+
+.variantStores{margin-top:16px;padding-top:12px;border-top:1px solid #e8edf2;text-align:left}.variantStores h3{color:#0066b3;font-size:16px}.variantStores ul{padding-left:20px;margin:8px 0}.variantStores li{margin:8px 0;line-height:1.5}
