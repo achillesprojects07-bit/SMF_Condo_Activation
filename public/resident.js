@@ -162,6 +162,13 @@
   function brandFont(ctx, size, weight) { ctx.font = (weight || 400) + " " + size + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"; }
   function wrapText(ctx, text, maxW) { var words = String(text || "").split(/\s+/), out = [], cur = ""; words.forEach(function (w) { var n = cur ? cur + " " + w : w; if (cur && ctx.measureText(n).width > maxW) { out.push(cur); cur = w; } else cur = n; }); if (cur) out.push(cur); return out; }
 
+  function registeredLabel(t) {
+    var m = String(t.registeredAt || "").match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+    if (!m) return t.registeredAt || t.date || "";
+    var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var h = Number(m[4]), ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+    return months[Number(m[2]) - 1] + " " + Number(m[3]) + ", " + m[1] + ", " + h + ":" + m[5] + " " + ap;
+  }
   function drawBrandedTicket(ctx, t, W, logo, shots, draw) {
     var pad = 64, inner = W - pad * 2, y = 64;
     ctx.textBaseline = "top"; ctx.textAlign = "center";
@@ -191,12 +198,14 @@
     // packs
     (t.samples || []).forEach(function (s) {
       var c = VARIANT[s.id] || { bg: "#eef5fb", line: BRAND.blue, ink: BRAND.blue };
-      brandFont(ctx, 34, 900); var label = s.name, w1 = ctx.measureText("FREE ").width, w2 = ctx.measureText(label).width;
-      if (draw) { rrect(ctx, pad, y, inner, 84, 22, c.bg, c.line, 4); var sx = (W - w1 - w2) / 2; ctx.textAlign = "left"; ctx.fillStyle = BRAND.green; ctx.fillText("FREE ", sx, y + 23); ctx.fillStyle = c.ink; ctx.fillText(label, sx + w1, y + 23); ctx.textAlign = "center"; }
+      var label = (productInfo[s.id] ? productInfo[s.id].title + " 150g" : s.name), fs = 34;
+      brandFont(ctx, fs, 900); while (fs > 24 && ctx.measureText("FREE " + label).width > inner - 40) { fs -= 1; brandFont(ctx, fs, 900); }
+      var w1 = ctx.measureText("FREE ").width, w2 = ctx.measureText(label).width;
+      if (draw) { rrect(ctx, pad, y, inner, 84, 22, c.bg, c.line, 4); var sx = (W - w1 - w2) / 2; ctx.textAlign = "left"; var ty = y + (84 - fs * 1.2) / 2; ctx.fillStyle = BRAND.green; ctx.fillText("FREE ", sx, ty); ctx.fillStyle = c.ink; ctx.fillText(label, sx + w1, ty); ctx.textAlign = "center"; }
       y += 100;
     });
     (t.unavailableSamples || []).forEach(function (s) {
-      brandFont(ctx, 30, 700); if (draw) { rrect(ctx, pad, y, inner, 72, 20, "#f2f4f7", "#d0d5dd", 3); ctx.fillStyle = BRAND.muted; ctx.fillText(s.name + " — OUT OF STOCK", W / 2, y + 20); }
+      brandFont(ctx, 30, 700); if (draw) { rrect(ctx, pad, y, inner, 72, 20, "#f2f4f7", "#d0d5dd", 3); ctx.fillStyle = BRAND.muted; ctx.fillText((productInfo[s.id] ? productInfo[s.id].title : s.name) + " — OUT OF STOCK", W / 2, y + 20); }
       y += 88;
     });
     brandFont(ctx, 26, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText("One 150g pack per applicable variant, regardless of pet count.", W / 2, y); } y += 44;
@@ -226,7 +235,8 @@
     // footer
     brandFont(ctx, 28, 700); wrapText(ctx, t.status === "CLAIMED" ? "This ticket has already been redeemed." : "Show this QR code to our NutriChunks & Majesty Pet Pals.", inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.ink; ctx.fillText(l, W / 2, y); } y += 40; });
     brandFont(ctx, 25, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText("Available while supplies last. One free pack per mobile number.", W / 2, y); } y += 38;
-    brandFont(ctx, 21, 400); if (draw) { ctx.fillStyle = "#98a2b3"; ctx.fillText((t.condoName || "") + " • " + (t.registeredAt || t.date || "") + "  •  © 2026 Aileen Narciso / Slingshotz Advertising Inc.", W / 2, y); } y += 34;
+    brandFont(ctx, 21, 400); if (draw) { ctx.fillStyle = "#98a2b3"; ctx.fillText((t.condoName || "") + " • Registered " + registeredLabel(t), W / 2, y); } y += 32;
+    if (draw) ctx.fillText("© 2026 Aileen Narciso / Slingshotz Advertising Inc.", W / 2, y); y += 34;
     return y + 46;
   }
 
