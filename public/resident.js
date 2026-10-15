@@ -151,17 +151,95 @@
   function ticketProducts(t) {
     return (t.samples || []).concat(t.unavailableSamples || []).filter(function(s,i,all){return productInfo[s.id] && all.findIndex(function(x){return x.id===s.id;})===i;});
   }
+  /* ---------- saved image: the branded ticket (logo, FREE NutriChunks or Majesty, QR, big number, packs),
+     then product shots and the "where to buy" stores ---------- */
+  var BRAND = { blue: "#0066b3", green: "#12a150", orange: "#f47b20", purple: "#6a2c91", ink: "#1c2733", muted: "#475467", line: "#e8edf2" };
+  function loadImg(src) { return new Promise(function (res) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { res(null); }; i.src = src; }); }
+  function rrect(ctx, x, y, w, h, r, fill, stroke, lw) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw || 4; ctx.strokeStyle = stroke; ctx.stroke(); }
+  }
+  function brandFont(ctx, size, weight) { ctx.font = (weight || 400) + " " + size + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"; }
+  function wrapText(ctx, text, maxW) { var words = String(text || "").split(/\s+/), out = [], cur = ""; words.forEach(function (w) { var n = cur ? cur + " " + w : w; if (cur && ctx.measureText(n).width > maxW) { out.push(cur); cur = w; } else cur = n; }); if (cur) out.push(cur); return out; }
+
+  function drawBrandedTicket(ctx, t, W, logo, shots, draw) {
+    var pad = 64, inner = W - pad * 2, y = 64;
+    ctx.textBaseline = "top"; ctx.textAlign = "center";
+    if (logo) { var lh = 112, lw = logo.width * lh / logo.height; if (draw) ctx.drawImage(logo, (W - lw) / 2, y, lw, lh); y += lh + 28; }
+    // headline
+    brandFont(ctx, 64, 900);
+    var parts = [["FREE ", BRAND.green], ["NutriChunks", BRAND.orange], [" or ", BRAND.ink], ["Majesty", BRAND.purple]];
+    var tw = parts.reduce(function (a, p) { return a + ctx.measureText(p[0]).width; }, 0), x = (W - tw) / 2;
+    if (draw) { ctx.textAlign = "left"; parts.forEach(function (p) { ctx.fillStyle = p[1]; ctx.fillText(p[0], x, y); x += ctx.measureText(p[0]).width; }); ctx.textAlign = "center"; }
+    y += 82;
+    brandFont(ctx, 32, 600); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText(t.condoName || "", W / 2, y); } y += 76;
+    // QR in a blue box
+    var ids = (t.samples || []).map(function (s) { return s.id; });
+    var q = qrcode(0, "M"); q.addData("SMFC1|" + t.code + "|" + ids.join(",")); q.make();
+    var n = q.getModuleCount(), size = 480, cell = Math.floor(size / (n + 4)), side = cell * (n + 4), qx = Math.round((W - side) / 2);
+    if (draw) {
+      rrect(ctx, qx - 22, y - 22, side + 44, side + 44, 34, "#fff", BRAND.blue, 10);
+      ctx.fillStyle = "#000";
+      for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) ctx.fillRect(qx + (c + 2) * cell, y + (r + 2) * cell, cell, cell);
+    }
+    y += side + 48;
+    // the ticket number
+    brandFont(ctx, 104, 900); if (draw) { ctx.fillStyle = BRAND.ink; ctx.fillText(t.code, W / 2, y); } y += 118;
+    brandFont(ctx, 32, 600); var who = [t.petNames, t.name].filter(Boolean).join(" • ");
+    if (who) { wrapText(ctx, who, inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText(l, W / 2, y); } y += 44; }); y += 10; }
+    if (t.status === "CLAIMED") { brandFont(ctx, 34, 900); if (draw) { rrect(ctx, W / 2 - 240, y, 480, 66, 33, BRAND.green); ctx.fillStyle = "#fff"; ctx.fillText("✓ FREE PACK RECEIVED", W / 2, y + 14); } y += 90; }
+    // packs
+    (t.samples || []).forEach(function (s) {
+      var c = VARIANT[s.id] || { bg: "#eef5fb", line: BRAND.blue, ink: BRAND.blue };
+      brandFont(ctx, 34, 900); var label = s.name, w1 = ctx.measureText("FREE ").width, w2 = ctx.measureText(label).width;
+      if (draw) { rrect(ctx, pad, y, inner, 84, 22, c.bg, c.line, 4); var sx = (W - w1 - w2) / 2; ctx.textAlign = "left"; ctx.fillStyle = BRAND.green; ctx.fillText("FREE ", sx, y + 23); ctx.fillStyle = c.ink; ctx.fillText(label, sx + w1, y + 23); ctx.textAlign = "center"; }
+      y += 100;
+    });
+    (t.unavailableSamples || []).forEach(function (s) {
+      brandFont(ctx, 30, 700); if (draw) { rrect(ctx, pad, y, inner, 72, 20, "#f2f4f7", "#d0d5dd", 3); ctx.fillStyle = BRAND.muted; ctx.fillText(s.name + " — OUT OF STOCK", W / 2, y + 20); }
+      y += 88;
+    });
+    brandFont(ctx, 26, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText("One 150g pack per applicable variant, regardless of pet count.", W / 2, y); } y += 44;
+    if (t.status !== "CLAIMED" && eventDateLabel(t.date)) {
+      brandFont(ctx, 30, 800); wrapText(ctx, claimNote(t), inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.blue; ctx.fillText(l, W / 2, y); } y += 42; }); y += 8;
+    }
+    // product shots
+    if (shots.length) {
+      y += 24; if (draw) { ctx.fillStyle = BRAND.line; ctx.fillRect(pad, y, inner, 3); } y += 34;
+      brandFont(ctx, 34, 900); if (draw) { ctx.fillStyle = BRAND.blue; ctx.fillText("Your applicable products", W / 2, y); } y += 58;
+      var colW = inner / Math.min(2, shots.length);
+      for (var i = 0; i < shots.length; i += 2) {
+        var rowH = 0;
+        shots.slice(i, i + 2).forEach(function (sh, k) {
+          var cx = pad + (shots.length === 1 ? inner / 2 : colW * k + colW / 2), h = 0;
+          if (sh.img) { var sc = Math.min(360 / sh.img.naturalWidth, 340 / sh.img.naturalHeight), iw = sh.img.naturalWidth * sc, ih = sh.img.naturalHeight * sc; if (draw) ctx.drawImage(sh.img, cx - iw / 2, y, iw, ih); h = ih + 16; }
+          brandFont(ctx, 26, 800); var tl = wrapText(ctx, sh.title, colW - 30);
+          tl.forEach(function (l, j) { if (draw) { ctx.fillStyle = BRAND.ink; ctx.fillText(l, cx, y + h + j * 34); } });
+          rowH = Math.max(rowH, h + tl.length * 34);
+        });
+        y += rowH + 30;
+      }
+    }
+    // where to buy
+    var storesH = drawStoresPanel(ctx, t, y, W, !draw); ctx.textAlign = "center"; ctx.textBaseline = "top";
+    y += storesH ? storesH + 10 : 20;
+    // footer
+    brandFont(ctx, 28, 700); wrapText(ctx, t.status === "CLAIMED" ? "This ticket has already been redeemed." : "Show this QR code to our NutriChunks & Majesty Pet Pals.", inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.ink; ctx.fillText(l, W / 2, y); } y += 40; });
+    brandFont(ctx, 25, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText("Available while supplies last. One free pack per mobile number.", W / 2, y); } y += 38;
+    brandFont(ctx, 21, 400); if (draw) { ctx.fillStyle = "#98a2b3"; ctx.fillText((t.condoName || "") + " • " + (t.registeredAt || t.date || "") + "  •  © 2026 Aileen Narciso / Slingshotz Advertising Inc.", W / 2, y); } y += 34;
+    return y + 46;
+  }
+
   async function ticketWithProductShots(t) {
-    var ticket=ticketImage(t), products=ticketProducts(t);
-    var images=await Promise.all(products.map(function(s){return new Promise(function(resolve,reject){var img=new Image();img.onload=function(){resolve(img);};img.onerror=function(){reject(new Error('Product image could not load'));};img.src=productInfo[s.id].image;});}));
-    var probe=document.createElement('canvas').getContext('2d'), productsH=products.length?90+Math.ceil(products.length/2)*460:0, storesH=drawStoresPanel(probe,t,0,ticket.width,true);
-    if (!products.length && !storesH) return ticket.toDataURL('image/png');
-    var result=document.createElement('canvas');result.width=ticket.width;result.height=ticket.height+productsH+storesH;
-    var ctx=result.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,result.width,result.height);ctx.drawImage(ticket,0,0);
-    ctx.textAlign='center';ctx.fillStyle='#043765';ctx.font='bold 30px sans-serif';if(products.length)ctx.fillText('Your applicable products for future reference',480,ticket.height+47);
-    products.forEach(function(s,i){var img=images[i],left=(i%2)*480,top=ticket.height+80+Math.floor(i/2)*460,scale=Math.min(410/img.naturalWidth,350/img.naturalHeight),w=img.naturalWidth*scale,h=img.naturalHeight*scale;ctx.drawImage(img,left+(480-w)/2,top,w,h);ctx.font='bold 22px sans-serif';var title=productInfo[s.id].title,words=title.split(' '),line='',lines=[];words.forEach(function(word){var next=line?line+' '+word:word;if(line&&ctx.measureText(next).width>430){lines.push(line);line=word;}else line=next;});if(line)lines.push(line);lines.forEach(function(line,j){ctx.fillText(line,left+240,top+380+j*28);});});
-    drawStoresPanel(ctx,t,ticket.height+productsH,ticket.width,false);
-    return result.toDataURL('image/png');
+    var W = 1080, logo = await loadImg("smf-logo.png");
+    var shots = await Promise.all(ticketProducts(t).map(function (s) { return loadImg(productInfo[s.id].image).then(function (img) { return { img: img, title: productInfo[s.id].title }; }); }));
+    var probe = document.createElement("canvas").getContext("2d");
+    var H = Math.ceil(drawBrandedTicket(probe, t, W, logo, shots, false));
+    var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    var ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+    rrect(ctx, 14, 14, W - 28, H - 28, 40, null, BRAND.blue, 14);
+    drawBrandedTicket(ctx, t, W, logo, shots, true);
+    return cv.toDataURL("image/png");
   }
   async function saveTicketImage(t) {
     var status = $("saveImageStatus");
