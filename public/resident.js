@@ -86,29 +86,93 @@
     return canvas;
   }
 
+  /* ---------- where to buy (STORES tab in the sheet) ---------- */
+  var VARIANT = {
+    NC_PUPPY_LAMB: { cls: "variant-puppy", bg: "#fff3d6", line: "#efa72c", ink: "#795006" },
+    NC_MAINT_ADULT: { cls: "variant-maintenance", bg: "#e2f7f3", line: "#199e91", ink: "#096f64" },
+    NC_SMALL_BREED: { cls: "variant-small", bg: "#ffedf0", line: "#e26e89", ink: "#99344a" },
+    MJ_ADULT_SALMON: { cls: "variant-majesty", bg: "#f5eefa", line: "#6a2c91", ink: "#6a2c91" }
+  };
+  function variantLabel(id, t) {
+    if (productInfo[id]) return productInfo[id].title;
+    var s = (t.samples || []).concat(t.unavailableSamples || []).filter(function (x) { return x.id === id; })[0];
+    return s ? String(s.name).replace(/\s*\d+\s*g$/i, "") : id;
+  }
+  function variantIds(t) { return (t.samples || []).concat(t.unavailableSamples || []).map(function (s) { return s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }); }
+  function storeAddress(st) { return [st.address, st.city].filter(Boolean).join(", "); }
+  function renderStores(t) {
+    var stores = t.stores || [], box = $("buyBox");
+    if (!box || !stores.length) return;
+    box.hidden = false;
+    var names = variantIds(t).map(function (id) { return variantLabel(id, t); });
+    $("buySub").textContent = "Stores near " + (t.condoName || "your condo") + (names.length ? " that sell " + names.join(" and ") + "." : ".");
+    $("buyList").innerHTML = stores.map(function (st, i) {
+      var tags = (st.has || []).map(function (id) { return '<span class="tag ' + ((VARIANT[id] || {}).cls || "") + '">' + esc(variantLabel(id, t)) + "</span>"; }).join("");
+      var map = st.map || ("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(st.name + " " + storeAddress(st)));
+      return '<div class="store"><div class="pin">' + (i + 1) + '</div><div><div class="storeName">' + esc(st.name) + '</div><div class="storeAddr">' + esc(storeAddress(st)) + "</div>" +
+        (tags ? '<div class="storeTags">' + tags + "</div>" : "") + '<a class="mapLink" target="_blank" rel="noopener" href="' + esc(map) + '">Open in Maps →</a></div></div>';
+    }).join("");
+  }
+  /** Draws the "Where to buy near you" panel; returns its height. measure = true only measures. */
+  function drawStoresPanel(ctx, t, top, W, measure) {
+    var stores = t.stores || []; if (!stores.length) return 0;
+    var pad = 48, inner = W - pad * 2, y = top + 36;
+    function f(size, w) { ctx.font = (w || 400) + " " + size + "px sans-serif"; }
+    function wrapLines(text, maxW) { var words = String(text).split(/\s+/), out = [], cur = ""; words.forEach(function (w) { var n = cur ? cur + " " + w : w; if (cur && ctx.measureText(n).width > maxW) { out.push(cur); cur = w; } else cur = n; }); if (cur) out.push(cur); return out; }
+    function rr(x, y2, w, h, r, fill, stroke, lw) { ctx.beginPath(); ctx.moveTo(x + r, y2); ctx.arcTo(x + w, y2, x + w, y2 + h, r); ctx.arcTo(x + w, y2 + h, x, y2 + h, r); ctx.arcTo(x, y2 + h, x, y2, r); ctx.arcTo(x, y2, x + w, y2, r); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw || 3; ctx.strokeStyle = stroke; ctx.stroke(); } }
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    var names = variantIds(t).map(function (id) { return variantLabel(id, t); });
+    var startY = y;
+    y += 30; f(42, 900); if (!measure) { ctx.fillStyle = "#0066b3"; ctx.fillText("Where to buy near you", pad + 28, y); } y += 58;
+    f(26, 500); wrapLines(names.length ? "Get your " + names.join(" and ") + " at these stores near " + (t.condoName || "you") + ":" : "Stores near " + (t.condoName || "you") + ":", inner - 56).forEach(function (l) { if (!measure) { ctx.fillStyle = "#475467"; ctx.fillText(l, pad + 28, y); } y += 36; });
+    y += 12;
+    stores.forEach(function (st, i) {
+      var tx = pad + 28 + 74, tw = inner - 56 - 74, row = y;
+      f(32, 800); var nl = wrapLines(st.name, tw); f(26, 400); var al = wrapLines(storeAddress(st), tw);
+      var h = nl.length * 40 + al.length * 34 + ((st.has || []).length ? 54 : 0) + 22;
+      if (!measure) {
+        ctx.beginPath(); ctx.arc(pad + 28 + 26, row + 26, 26, 0, Math.PI * 2); ctx.fillStyle = "#0066b3"; ctx.fill();
+        f(28, 900); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(String(i + 1), pad + 28 + 26, row + 11); ctx.textAlign = "left";
+        var yy = row; f(32, 800); ctx.fillStyle = "#1c2733"; nl.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 40; });
+        f(26, 400); ctx.fillStyle = "#475467"; al.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 34; });
+        var gx = tx; (st.has || []).forEach(function (id) {
+          var c = VARIANT[id] || { bg: "#eef5fb", line: "#0066b3", ink: "#0066b3" }, label = variantLabel(id, t); f(21, 800);
+          var w = ctx.measureText(label).width + 28; if (gx + w > tx + tw) return;
+          rr(gx, yy + 8, w, 36, 18, c.bg, c.line, 2); ctx.fillStyle = c.ink; ctx.fillText(label, gx + 14, yy + 15); gx += w + 8;
+        });
+      }
+      y += h;
+    });
+    y += 10;
+    if (!measure) rr(pad, startY, inner, y - startY, 28, null, "#0066b3", 5);
+    return y - top + 20;
+  }
+
   function ticketProducts(t) {
     return (t.samples || []).concat(t.unavailableSamples || []).filter(function(s,i,all){return productInfo[s.id] && all.findIndex(function(x){return x.id===s.id;})===i;});
   }
   async function ticketWithProductShots(t) {
     var ticket=ticketImage(t), products=ticketProducts(t);
     var images=await Promise.all(products.map(function(s){return new Promise(function(resolve,reject){var img=new Image();img.onload=function(){resolve(img);};img.onerror=function(){reject(new Error('Product image could not load'));};img.src=productInfo[s.id].image;});}));
-    if (!products.length) return ticket.toDataURL('image/png');
-    var result=document.createElement('canvas');result.width=ticket.width;result.height=ticket.height+90+Math.ceil(products.length/2)*460;
+    var probe=document.createElement('canvas').getContext('2d'), productsH=products.length?90+Math.ceil(products.length/2)*460:0, storesH=drawStoresPanel(probe,t,0,ticket.width,true);
+    if (!products.length && !storesH) return ticket.toDataURL('image/png');
+    var result=document.createElement('canvas');result.width=ticket.width;result.height=ticket.height+productsH+storesH;
     var ctx=result.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,result.width,result.height);ctx.drawImage(ticket,0,0);
-    ctx.textAlign='center';ctx.fillStyle='#043765';ctx.font='bold 30px sans-serif';ctx.fillText('Your applicable products for future reference',480,ticket.height+47);
+    ctx.textAlign='center';ctx.fillStyle='#043765';ctx.font='bold 30px sans-serif';if(products.length)ctx.fillText('Your applicable products for future reference',480,ticket.height+47);
     products.forEach(function(s,i){var img=images[i],left=(i%2)*480,top=ticket.height+80+Math.floor(i/2)*460,scale=Math.min(410/img.naturalWidth,350/img.naturalHeight),w=img.naturalWidth*scale,h=img.naturalHeight*scale;ctx.drawImage(img,left+(480-w)/2,top,w,h);ctx.font='bold 22px sans-serif';var title=productInfo[s.id].title,words=title.split(' '),line='',lines=[];words.forEach(function(word){var next=line?line+' '+word:word;if(line&&ctx.measureText(next).width>430){lines.push(line);line=word;}else line=next;});if(line)lines.push(line);lines.forEach(function(line,j){ctx.fillText(line,left+240,top+380+j*28);});});
+    drawStoresPanel(ctx,t,ticket.height+productsH,ticket.width,false);
     return result.toDataURL('image/png');
   }
   async function saveTicketImage(t) {
     var status = $("saveImageStatus");
-    var button=$('saveImage');button.disabled=true;status.textContent='Preparing your ticket and product shots…';
+    var button=$('saveImage');button.disabled=true;status.textContent='Preparing your ticket, product shots and nearby stores…';
     try {
       var url = await ticketWithProductShots(t), link = document.createElement("a");
       link.href = url; link.download = "SMF-Claim-" + String(t.code).replace(/[^A-Za-z0-9-]/g, "") + ".png";
       document.body.appendChild(link); link.click(); link.remove();
       $("savedTicketImage").src = url; $("savedTicketPreview").hidden = false;
-      status.textContent = "Your QR ticket and product shots are ready. Check your downloads, or touch and hold the image below to save it to Photos / Gallery.";
-    } catch (e) { status.textContent = "The image could not be saved. Please take a screenshot of your ticket instead."; }
+      status.textContent = "Your QR ticket, product shots and nearby stores are ready. Check your downloads, or touch and hold the image below to save it to Photos / Gallery.";
+    } catch (e) { if (window.console) console.error("saveTicketImage", e); status.textContent = "The image could not be saved. Please take a screenshot of your ticket instead."; }
     finally {button.disabled=false;}
   }
 
@@ -152,6 +216,7 @@
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     $("saveImage").onclick = function () { saveTicketImage(t); };
     showApplicableProducts(t,false);
+    renderStores(t);
     $('viewFeatures').onclick=function(){window.scrollTo(0,0);showRecommendations(t);};
     if (t.status === "CLAIMED") main.querySelector(".redeemPrompt").textContent = "Your freebie has already been redeemed.";
     var box = main.querySelector(".ticket");

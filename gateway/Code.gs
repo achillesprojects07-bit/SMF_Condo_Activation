@@ -19,6 +19,7 @@ var TABLES = {
   STAFF: ['STAFF_CODE', 'BA_NAME', 'PIN', 'STATUS'],
   BRANDS: ['BRAND', 'PET_TYPE', 'STATUS'],
   SETTINGS: ['KEY', 'VALUE', 'NOTE'],
+  STORES: ['FOR_CONDOS', 'STORE_NAME', 'ADDRESS', 'CITY', 'CARRIES', 'MAP_LINK', 'STATUS'],
   REGISTRATIONS: ['CLAIM_CODE', 'REG_ID', 'REGISTERED_AT', 'DATE', 'CONDO_ID', 'CONDO_NAME',
     'CONSENT', 'PROMO_OPT_IN', 'RESIDENT_NAME', 'MOBILE', 'PET_TYPE',
     'DOG_COUNT', 'DOG_NAMES', 'DOG_AGE', 'DOG_SIZE', 'DOG_BRAND',
@@ -361,9 +362,39 @@ function ticketView_(r, condo) {
     petNames: [r.DOG_NAMES, r.CAT_NAMES].filter(String).join(', '),
     samples: samples.map(function (id) { return { id: id, name: names[id] || id, stockLeft: stock[id] ? Math.max(0, stock[id].left) : 0 }; }),
     unavailableSamples: unavailable.map(function (id) { return { id: id, name: names[id] || id }; }),
+    stores: storesFor_(r.CONDO_ID, samples.concat(unavailable)),
     noStock: !!r.UNAVAILABLE_SAMPLES || [r.SAMPLE_DOG, r.SAMPLE_CAT].indexOf('NONE') >= 0,
     claimedAt: r.CLAIMED_AT || '', claimedBy: r.CLAIMED_BY || ''
   };
+}
+
+/** Stores near a condo that sell the customer's applicable variant(s). STORES tab, one row per store:
+ *  FOR_CONDOS = condo codes (MR, RR) or ALL;  CARRIES = product IDs (NC_SMALL_BREED, MJ_ADULT_SALMON) or ALL. */
+function storesFor_(condoId, variantIds) {
+  if (!book_().getSheetByName('STORES')) return [];
+  var cid = String(condoId || '').toUpperCase(), want = (variantIds || []).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+  var list = function (v) { return String(v || '').toUpperCase().split(/[,;\s]+/).filter(String); };
+  var out = [];
+  read_('STORES').forEach(function (st) {
+    if (String(st.STATUS || 'ACTIVE').toUpperCase() === 'INACTIVE' || !st.STORE_NAME) return;
+    var condos = list(st.FOR_CONDOS);
+    if (condos.length && condos.indexOf('ALL') < 0 && condos.indexOf(cid) < 0) return;
+    var carries = list(st.CARRIES), all = !carries.length || carries.indexOf('ALL') >= 0;
+    var has = all ? want.slice() : want.filter(function (id) { return carries.indexOf(id) >= 0; });
+    if (want.length && !has.length) return;
+    out.push({ name: st.STORE_NAME, address: st.ADDRESS || '', city: st.CITY || '', map: /^https:\/\//.test(st.MAP_LINK) ? st.MAP_LINK : '', has: has });
+  });
+  return out.slice(0, 15);
+}
+
+/** Mirea Residences (Pasig) + its nearby stores from the Sales team. Safe to run again: adds only what is missing. */
+function addMirea_() {
+  if (!findCondo_('MR')) sheet_('CONDOS').appendRow(['MR', 'Mirea Residences', 'Pasig City', '', 'MR', 'ACTIVE']);
+  var have = read_('STORES').map(function (r) { return r.STORE_NAME.toUpperCase(); });
+  [['MR', 'LJL Poultry Supply', '119 Evangelista St.', 'Pasig', 'ALL', '', 'ACTIVE'],
+   ['MR', 'Ambies Rice and Feeds Supplier', 'Karangalan Village', 'Pasig City', 'ALL', '', 'ACTIVE'],
+   ['MR', 'Justinoy Poultry & Pet Supply \u2013 Octagon', 'Octagon', 'Pasig', 'ALL', '', 'ACTIVE']
+  ].forEach(function (r) { if (have.indexOf(r[1].toUpperCase()) < 0) sheet_('STORES').appendRow(r); });
 }
 
 function staffLogin_(p) {
@@ -541,6 +572,7 @@ function setupSheets() {
       Object.keys(DAILY_STOCK_SEED).forEach(function (id) { sheet_('STOCK').appendRow(['2026-10-10', c, id, DAILY_STOCK_SEED[id]]); });
     });
   }
+  addMirea_();
   var props = PropertiesService.getScriptProperties();
   if (!props.getProperty('GATEWAY_SECRET')) props.setProperty('GATEWAY_SECRET', Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, ''));
   if (!props.getProperty('PHOTO_FOLDER_ID')) props.setProperty('PHOTO_FOLDER_ID', DriveApp.createFolder('SMF Condo Activation Photos').getId());

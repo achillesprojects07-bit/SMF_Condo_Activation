@@ -43,7 +43,7 @@ test("wrong secret is refused", () => {
 test("setup creates every tab and Saturday's two condos with stock", () => {
   const g = fresh();
   for (const t of ["CONDOS", "SCHEDULE", "STOCK", "PRODUCTS", "STAFF", "BRANDS", "SETTINGS", "REGISTRATIONS", "REDEMPTIONS"]) assert.ok(g.sheets.get(t), t);
-  assert.deepEqual(g.table("CONDOS").map(c => c.CONDO_ID), ["RR", "LV"]);
+  assert.deepEqual(g.table("CONDOS").map(c => c.CONDO_ID), ["RR", "LV", "MR"]);
   const rr = g.table("STOCK").filter(s => s.CONDO_ID === "RR");
   assert.deepEqual(Object.fromEntries(rr.map(s => [s.PRODUCT_ID, s.ALLOCATED])), { NC_PUPPY_LAMB: 24, NC_MAINT_ADULT: 111, NC_SMALL_BREED: 115, MJ_ADULT_SALMON: 250 });
   assert.match(g.pinOf("PM01"), /^\d{4}$/);
@@ -374,3 +374,31 @@ test('photo storage failure blocks registration without reserving stock',()=>{
  assert.equal(g.call('register',request).error,'PET_PHOTO_SAVE_FAILED');assert.equal(g.table('REGISTRATIONS').length,0);
  assert.equal(g.ctx.stockFor_('RR','2026-10-10').NC_PUPPY_LAMB.reserved,0);
 });
+test("Mirea + its 3 stores are set up, and the ticket lists them with the customer's variant", () => {
+  const g = fresh();
+  assert.ok(g.table("CONDOS").find(c => c.CONDO_ID === "MR"));
+  assert.equal(g.table("STORES").length, 3);
+  g.setSetting("TEST_MODE", "YES");
+  const r = g.call("register", dogReg({ condoId: "MR", mobile: "09170005555", petType: "BOTH", cat: { names: "Muning", age: "ADULT", brand: "Whiskas" } }));
+  assert.equal(r.ok, true);
+  assert.equal(r.ticket.code, "MR-0001");
+  assert.deepEqual(r.ticket.stores.map(s => s.name), ["LJL Poultry Supply", "Ambies Rice and Feeds Supplier", "Justinoy Poultry & Pet Supply \u2013 Octagon"]);
+  assert.deepEqual(r.ticket.stores[0].has, ["NC_SMALL_BREED", "MJ_ADULT_SALMON"]);
+  // Rainbow Ridge customers don't see Mirea's stores
+  assert.deepEqual(g.call("register", dogReg({ mobile: "09170006666" })).ticket.stores, []);
+  // running setup again doesn't duplicate
+  g.ctx.setupSheets(); assert.equal(g.table("STORES").length, 3);
+});
+
+test("stores can be limited to the variants they carry", () => {
+  const g = fresh(); g.setSetting("TEST_MODE", "YES");
+  g.sheets.get("STORES").rows.push(["MR", "Cat Only Shop", "1 Street", "Pasig", "MJ_ADULT_SALMON", "https://maps.app.goo.gl/x", "ACTIVE"]);
+  g.sheets.get("STORES").rows.push(["ALL", "Closed Shop", "2 Street", "Pasig", "ALL", "", "INACTIVE"]);
+  const dog = g.call("register", dogReg({ condoId: "MR", mobile: "09170007777" })).ticket;
+  assert.ok(!dog.stores.some(s => s.name === "Cat Only Shop"));
+  assert.ok(!dog.stores.some(s => s.name === "Closed Shop"));
+  const cat = g.call("register", dogReg({ condoId: "MR", mobile: "09170008888", petType: "CAT", cat: { names: "x", age: "ADULT", brand: "Whiskas" } })).ticket;
+  const shop = cat.stores.find(s => s.name === "Cat Only Shop");
+  assert.deepEqual(shop.has, ["MJ_ADULT_SALMON"]); assert.equal(shop.map, "https://maps.app.goo.gl/x");
+});
+

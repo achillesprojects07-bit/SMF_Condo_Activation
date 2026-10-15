@@ -14,7 +14,7 @@ export function startDevServer(port = 8788, opts = {}) {
   const env = { GATEWAY_URL: "https://script.example/exec", GATEWAY_SECRET: gw.secret, ...(opts.minimalSecrets ? {} : { SESSION_SECRET: "dev-session-secret-0123456789", REPORT_PASSCODE: "client2026" }) };
   const fakeFetch = async (_url, init) => new Response(JSON.stringify(gw.post(JSON.parse(init.body))), { headers: { "Content-Type": "application/json" } });
   const root = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "public");
-  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json" };
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost:" + port);
     if (url.pathname.startsWith("/api/")) {
