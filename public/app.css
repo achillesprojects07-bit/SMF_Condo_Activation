@@ -157,3 +157,6 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .tag.variant-small{background:#ffedf0;border-color:#e26e89;color:#99344a}
 .tag.variant-majesty{background:#f5eefa;border-color:#6a2c91;color:#6a2c91}
 .mapLink{font-size:13.5px;font-weight:800;color:var(--smfBlue);text-decoration:none;display:inline-block;margin-top:5px}
+
+.tkTop.tkBrand{font-size:clamp(15px,5.4vw,24px);font-weight:900;line-height:1.15;color:var(--ink);white-space:nowrap}
+.tkBrand .tkOr{color:var(--ink)}

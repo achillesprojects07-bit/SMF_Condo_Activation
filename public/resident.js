@@ -296,11 +296,11 @@
     $("tkPets").textContent = [t.petNames, t.name].filter(Boolean).join(" • ");
     var ids = (t.samples || []).map(function (s) { return s.id; });
     $("tkQr").innerHTML = qrSvg("SMFC1|" + t.code + "|" + ids.join(","));
-    var html = (t.samples || []).map(function (s) { return '<div class="sample ' + ({NC_PUPPY_LAMB:'variant-puppy',NC_MAINT_ADULT:'variant-maintenance',NC_SMALL_BREED:'variant-small',MJ_ADULT_SALMON:'variant-majesty'}[s.id] || '') + '">🎁 <span class="free">FREE</span> ' + esc(s.name) + "</div>"; }).join("");
+    var html = (t.samples || []).map(function (s) { return '<div class="sample ' + ({NC_PUPPY_LAMB:'variant-puppy',NC_MAINT_ADULT:'variant-maintenance',NC_SMALL_BREED:'variant-small',MJ_ADULT_SALMON:'variant-majesty'}[s.id] || '') + '">🎁 <span class="free">FREE</span> ' + esc(productInfo[s.id] ? productInfo[s.id].title + " 150g" : s.name) + "</div>"; }).join("");
     html += (t.unavailableSamples || []).map(function (s) { return '<div class="sample none">' + esc(s.name) + ' — OUT OF STOCK</div>'; }).join("");
     if (t.noStock && !(t.unavailableSamples || []).length) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
-    $("tkMeta").textContent = (t.condoName || "") + " • " + (t.registeredAt || t.date || "");
+    $("tkMeta").textContent = (t.condoName || "") + " • Registered " + registeredLabel(t);
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     $("saveImage").onclick = function () { saveTicketImage(t); };
     showApplicableProducts(t,false);
