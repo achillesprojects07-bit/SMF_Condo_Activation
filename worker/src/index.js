@@ -83,6 +83,15 @@ async function body(request) { try { return await request.json(); } catch { retu
 
 /* ---------- report numbers (done here so the sheet stays simple) ---------- */
 export function buildReport(raw) {
+  // Apply before any totals, charts, records or CSV data are produced.
+  // Keep the original Sheet records intact; this also covers older demo entries.
+  const isDemo = r => String(r.RESIDENT_NAME || "").trim().toLowerCase() === "demo";
+  const claimKey = r => String(r.CLAIM_CODE || "").trim().toUpperCase();
+  const demoClaims = new Set((raw.registrations || []).filter(isDemo).map(claimKey).filter(Boolean));
+  raw = { ...raw,
+    registrations: (raw.registrations || []).filter(r => !isDemo(r) && !demoClaims.has(claimKey(r))),
+    redemptions: (raw.redemptions || []).filter(r => !isDemo(r) && !demoClaims.has(claimKey(r)))
+  };
   const productName = Object.fromEntries((raw.products || []).map(p => [p.PRODUCT_ID, p.PRODUCT_NAME]));
   const condoName = Object.fromEntries((raw.condos || []).map(c => [c.CONDO_ID, c.CONDO_NAME]));
   const days = new Map();

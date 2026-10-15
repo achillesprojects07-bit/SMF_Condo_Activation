@@ -114,3 +114,24 @@ test('gateway recovers from transient read failures without retrying photo or st
   await assert.rejects(gateway(env,'condo',{},async()=>{calls++;return new Response('{"ok":false,"error":"GATEWAY","message":"configuration error"}');}));
   assert.equal(calls,1);
 });
+
+
+test("demo names are excluded from all report data before aggregation, across condos", async () => {
+  const { buildReport } = await import("../worker/src/index.js");
+  const registrations = ["demo", " DEMO ", "DeMo", "Demosthenes"].map((name, i) => ({
+    RESIDENT_NAME: name, CLAIM_CODE: "MR-" + i, CONDO_ID: i % 2 ? "AR" : "MR", DATE: "2026-10-17",
+    STATUS: "CLAIMED", PET_TYPE: "DOG", DOG_COUNT: 1, DOG_BRAND: i < 3 ? "Demo brand" : "Real brand", SAMPLES_GIVEN: "DOG"
+  }));
+  const raw = { registrations, redemptions: registrations.flatMap(r => [
+    { CLAIM_CODE: r.CLAIM_CODE.toLowerCase(), RESULT: "OK" },
+    { CLAIM_CODE: r.CLAIM_CODE, RESULT: "OOS" }
+  ]), products: [{ PRODUCT_ID: "DOG", PRODUCT_NAME: "Dog sample" }] };
+  const report = buildReport(raw);
+  assert.deepEqual(report.registrations.map(r => r.RESIDENT_NAME), ["Demosthenes"]);
+  assert.equal(report.redemptions.length, 2);
+  assert.equal(report.flags.length, 1);
+  assert.equal(report.days.reduce((sum, d) => sum + d.registered, 0), 1);
+  assert.equal(report.days.reduce((sum, d) => sum + (d.given.DOG || 0), 0), 1);
+  assert.deepEqual(report.brands.DOG, { "Real brand": 1 });
+  assert.equal(raw.registrations.length, 4);
+});
