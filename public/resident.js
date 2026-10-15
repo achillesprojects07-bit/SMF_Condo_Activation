@@ -25,7 +25,7 @@
     return new Date(date+'T00:00:00+08:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'Asia/Manila'}).toUpperCase();
   }
   function claimNote(t) {
-    return 'Claim on '+eventDateLabel(t.date)+(t.booth ? ' at '+t.booth+', '+t.condoName : ' at '+t.condoName+'. Exact booth location to be announced.');
+    return 'Claim on '+eventDateLabel(t.date)+(t.booth ? ' at '+t.booth+', '+t.condoName+'.' : ' at '+t.condoName+'.');
   }
 
   async function api(path, opts) {
@@ -473,7 +473,7 @@
     $("condoLine").textContent = info.condo.name;
     if (!info.running && !info.registrationOpen) { main.innerHTML = '<div class="warnbox">' + esc(info.condo.name) + ": there is no sampling today. We hope to see you at our next visit!</div>"; return; }
     buildForm();
-    if(info.preregistration){var notice=document.createElement('p');notice.className='warnbox';notice.textContent='Pre-register now. Claim on '+eventDateLabel(info.eventDate)+' at '+info.condo.name+'. '+(info.condo.booth?'Booth: '+info.condo.booth:'Exact booth location to be announced.');main.prepend(notice);}
+    if(info.preregistration){var notice=document.createElement('p');notice.className='warnbox';notice.textContent='Pre-register now. Claim on '+eventDateLabel(info.eventDate)+' at '+info.condo.name+'.'+(info.condo.booth?' Booth: '+info.condo.booth+'.':'');main.prepend(notice);}
   }
 
   start();
