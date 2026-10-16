@@ -190,3 +190,16 @@ select.big[data-pet]:focus-visible{outline:3px solid var(--blue);outline-offset:
 .btn.saveProducts{display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 3px 0 #b2d5f0}
 .saveProductsArrow{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;border-radius:50%;background:#e2f7e9;color:#087b39;border:2px solid #12a150;font-size:34px;font-weight:900;line-height:1}
 .btn.saveProducts>span:last-child{min-width:0}
+
+.saveConfirmPrompt{margin:14px 0;padding:14px;border-radius:12px;background:#eaf5ff;color:#043765}
+.saveConfirmPrompt p{margin:0 0 10px;font-size:16px;font-weight:600}
+.ticketSavedDialog{width:calc(100% - 32px);max-width:420px;max-height:90dvh;overflow-y:auto;box-sizing:border-box;border:3px solid #0066b3;border-radius:24px;padding:22px;text-align:center;background:#fff;color:#043765}
+.ticketSavedDialog::backdrop{background:rgba(4,28,50,.5)}
+.savedPetsArt{display:block;width:210px;max-width:75%;height:115px;object-fit:contain;margin:0 auto 10px}
+.savedCheck{width:44px;height:44px;margin:8px auto 14px;border-radius:50%;background:#12a150;color:#fff;font-size:30px;font-weight:800;line-height:44px}
+.ticketSavedDialog h2{font-size:26px;line-height:1.2;margin:0 0 14px;font-weight:850}
+.ticketSavedDialog h2 span{color:#119544}
+.savedGreeting{font-size:18px;line-height:1.45;margin:0 0 18px}
+.savedClaimNote{padding:16px;border-radius:14px;background:#eaf5ff;font-size:16px;line-height:1.5;margin:0 0 18px}
+.savedClaimNote strong{color:#0066b3}
+.ticketSavedDialog .btn{margin:0;min-height:48px}

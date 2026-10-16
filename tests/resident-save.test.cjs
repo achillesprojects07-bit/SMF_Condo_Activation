@@ -54,3 +54,16 @@ test('another registration needs neither an image download nor a redeemed sample
  vm.runInNewContext(fs.readFileSync('public/resident.js','utf8').replace('  start();','  globalThis.next = startAnotherRegistration;'),context);
  context.next({condoId:'AR',status:'PRE_REGISTERED'});assert.equal(new URL(target).searchParams.get('new'),'1');assert.equal(new URL(target).searchParams.get('c'),'AR');
 });
+
+test('saved artwork card opens only after confirmation and uses the ticket date',async()=>{
+ const created=[];let modalCount=0;
+ const status={appendChild(){}},elements={main:{},saveImageStatus:status,savedTicketPreview:{hidden:true}};
+ const document={getElementById:id=>elements[id]||null,body:{appendChild(){}},createElement:tag=>{const button={};const el={tag,innerHTML:'',querySelector:()=>button,setAttribute(){},addEventListener(){},showModal(){modalCount++;},close(){},remove(){}};created.push(el);return el;}};
+ const context={document,location:{search:''},URLSearchParams,navigator:{canShare:()=>true,share:async()=>{}},Date};
+ vm.runInNewContext(fs.readFileSync('public/resident.js','utf8').replace('  start();','  globalThis.save = saveTicketImage;'),context);
+ await context.save({}, {date:'2026-10-17',status:'PRE_REGISTERED'},false);
+ assert.equal(modalCount,0);assert.match(created[0].innerHTML,/Yes, I saved it/);
+ created[0].querySelector('button').onclick();assert.equal(modalCount,1);
+ assert.match(created[1].innerHTML,/October 17, 2026/);assert.match(created[1].innerHTML,/saved-pets.webp/);assert.match(created[1].innerHTML,/GOT IT/);
+ const count=created.length;await context.save({}, {date:'2026-10-17'},true);assert.equal(created.length,count);
+});
