@@ -556,6 +556,29 @@
     if (r.error === "ALREADY_REGISTERED" || r.error === "BAD_MOBILE") main.querySelector('.q[data-q="mobile"]').classList.add("bad");
   }
 
+  function registrationNoticeText(eventDate, now) {
+    var parts = new Intl.DateTimeFormat('en-US', {timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now || new Date());
+    function part(type) { return parts.filter(function(p) { return p.type === type; })[0].value; }
+    var today = part('year')+'-'+part('month')+'-'+part('day');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate || '')) return 'Register now to claim your FREE sample!';
+    if (eventDate > today) return 'Pre-register now to claim your FREE sample on '+eventDateLabel(eventDate)+'!';
+    if (eventDate === today) return 'Register now to claim your FREE sample today!';
+    return 'This sampling date has passed. Please check with our ambassadors for the next schedule.';
+  }
+  var registrationNoticeTimer = null;
+  function updateRegistrationNotice() {
+    var notice = $('registrationNotice'); if (!notice || !info) return;
+    notice.textContent = registrationNoticeText(info.eventDate);
+    notice.className = notice.textContent.indexOf('today!') >= 0 ? 'okbox' : 'warnbox';
+  }
+  function watchRegistrationDate() {
+    if (registrationNoticeTimer) clearInterval(registrationNoticeTimer);
+    updateRegistrationNotice();
+    registrationNoticeTimer = setInterval(updateRegistrationNotice, 30000);
+    document.addEventListener('visibilitychange', updateRegistrationNotice);
+    window.addEventListener('focus', updateRegistrationNotice);
+  }
+
   async function start() {
     var fresh = new URLSearchParams(location.search).get('new') === '1';
     var t = fresh ? null : loadTicket();
@@ -572,7 +595,8 @@
     $("condoLine").textContent = info.condo.name;
     if (!info.running && !info.registrationOpen) { main.innerHTML = '<div class="warnbox">' + esc(info.condo.name) + ": there is no sampling today. We hope to see you at our next visit!</div>"; return; }
     buildForm();
-    if(info.preregistration){var notice=document.createElement('p');notice.className='warnbox';notice.textContent='Pre-register now. Claim on '+eventDateLabel(info.eventDate)+' at '+info.condo.name+'.'+(info.condo.booth?' Booth: '+info.condo.booth+'.':'');main.prepend(notice);}
+    var notice=document.createElement('p');notice.id='registrationNotice';notice.setAttribute('aria-live','polite');main.prepend(notice);
+    watchRegistrationDate();
   }
 
   start();

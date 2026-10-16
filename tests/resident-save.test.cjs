@@ -67,3 +67,13 @@ test('saved artwork card opens only after confirmation and uses the ticket date'
  assert.match(created[1].innerHTML,/October 17, 2026/);assert.match(created[1].innerHTML,/saved-pets.webp/);assert.match(created[1].innerHTML,/GOT IT/);
  const count=created.length;await context.save({}, {date:'2026-10-17'},true);assert.equal(created.length,count);
 });
+
+
+test('registration message changes automatically at Manila midnight for each event date',()=>{
+ const context={document:{getElementById:()=>({})},location:{search:''},URLSearchParams,Intl,Date};
+ vm.runInNewContext(fs.readFileSync('public/resident.js','utf8').replace('  start();','  globalThis.notice = registrationNoticeText;'),context);
+ assert.match(context.notice('2026-10-17',new Date('2026-10-16T15:59:59Z')),/^Pre-register/);
+ assert.equal(context.notice('2026-10-17',new Date('2026-10-16T16:00:00Z')),'Register now to claim your FREE sample today!');
+ assert.match(context.notice('2026-10-18',new Date('2026-10-16T16:00:00Z')),/^Pre-register/);
+ assert.match(context.notice('2026-10-17',new Date('2026-10-17T16:00:00Z')),/date has passed/);
+});
