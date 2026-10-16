@@ -182,3 +182,11 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .btn.saveProducts{display:block;width:100%;margin-top:20px;padding:22px 14px;border:3px solid #0066b3;border-radius:14px;background:#d9efff;color:#004d87;font-size:19px;font-weight:800;line-height:1.4;white-space:normal}
 .btn.saveProducts:hover:not(:disabled){background:#dceeff}
 .btn.saveProducts:focus-visible{outline:3px solid #0066b3;outline-offset:3px}
+
+/* Readable native pet choices, with generous touch targets. */
+select.big[data-pet]{display:block;width:100%;max-width:100%;min-height:56px;font-family:inherit;font-size:19px;font-weight:600;line-height:1.4;padding:14px 10px;border:2px solid #98a2b3;border-radius:12px;color:var(--ink);background-color:#fff;box-sizing:border-box}
+select.big[data-pet] option{font-size:19px;font-weight:500}
+select.big[data-pet]:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.btn.saveProducts{display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 3px 0 #b2d5f0}
+.saveProductsArrow{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;border-radius:50%;background:#e2f7e9;color:#087b39;border:2px solid #12a150;font-size:34px;font-weight:900;line-height:1}
+.btn.saveProducts>span:last-child{min-width:0}
