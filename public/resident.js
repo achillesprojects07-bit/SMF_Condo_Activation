@@ -294,20 +294,13 @@
     }
     preview.scrollIntoView({behavior:'smooth', block:'start'});
   }
-  function offerSaveConfirmation(t) {
-    var status = $('saveImageStatus');
-    var prompt = document.createElement('div'); prompt.className = 'saveConfirmPrompt';
-    prompt.innerHTML = '<p>Have you saved your QR ticket or taken a screenshot?</p><button type="button" class="btn primary">Yes, I saved it</button>';
-    prompt.querySelector('button').onclick = function() { showSavedCard(t); };
-    status.appendChild(prompt);
-  }
-  function showSavedCard(t) {
+  function showTicketReminder(t) {
     var previous = $('ticketSavedDialog'); if (previous) previous.remove();
     var dialog = document.createElement('dialog'); dialog.id = 'ticketSavedDialog'; dialog.className = 'ticketSavedDialog';
     dialog.setAttribute('aria-labelledby', 'ticketSavedTitle');
     var date = /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') ? new Date(t.date+'T00:00:00+08:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'Asia/Manila'}) : '';
     var note = t.status === 'CLAIMED' ? 'This ticket has already been redeemed. Thank you for visiting us!' : 'Present your QR ticket to our ambassadors'+(date?' on <strong>'+esc(date)+'</strong>':' on your scheduled sampling day')+', <strong>until 5 PM</strong> to claim your free pack.';
-    dialog.innerHTML = '<img class="savedPetsArt" src="saved-pets.webp" alt="A friendly puppy and kitten"><div class="savedCheck" aria-hidden="true">✓</div><h2 id="ticketSavedTitle">Your <span>FREE</span> sample ticket is saved!</h2><p class="savedGreeting">We can’t wait to meet you and your fur baby.</p><p class="savedClaimNote">'+note+'</p><button type="button" class="btn saveImage">GOT IT</button>';
+    dialog.innerHTML = '<img class="savedPetsArt" src="saved-pets.webp" alt="A friendly puppy and kitten"><div class="savedCheck" aria-hidden="true">🐾</div><h2 id="ticketSavedTitle">Keep your QR ticket handy!</h2><p>Save it to your Photos/Gallery or take a screenshot.</p><p class="savedGreeting">We can’t wait to meet you and your fur baby.</p><p class="savedClaimNote">'+note+'</p><button type="button" class="btn saveImage">GOT IT</button>';
     document.body.appendChild(dialog);
     dialog.querySelector('button').onclick = function() { dialog.close(); };
     dialog.addEventListener('close', function() { dialog.remove(); });
@@ -319,18 +312,19 @@
       // Prepared before the tap so the native share sheet retains user activation.
       if (file && navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
         await navigator.share({files:[file]});
-        status.textContent = 'Check your Photos/Gallery for your saved image.';
-        if (t && !productsOnly) offerSaveConfirmation(t);
+        status.textContent = 'Check your Photos/Gallery for your ticket, or take a screenshot.';
+        if (t && !productsOnly) showTicketReminder(t);
         return;
       }
     } catch (e) {
       status.textContent = e.name === 'AbortError' ? 'Save menu closed. You can try again or take a screenshot of your ticket.' : 'Touch and hold the image below, then choose the available image-saving option.';
-      if (e.name !== 'AbortError') { showSavePreview(); if (t && !productsOnly) offerSaveConfirmation(t); }
+      if (e.name !== 'AbortError') showSavePreview();
+      if (t && !productsOnly) showTicketReminder(t);
       return;
     }
     status.textContent = 'Touch and hold the image below and choose Save Image / Save to Photos if offered. On a computer, right-click to save. Saving options depend on your browser.';
     showSavePreview();
-    if (t && !productsOnly) offerSaveConfirmation(t);
+    if (t && !productsOnly) showTicketReminder(t);
   }
 
   // Product claims checked against San Miguel Pet Care variant pages.
