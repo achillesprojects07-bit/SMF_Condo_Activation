@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 function load(navigator={}){
- const els={main:{},saveImageStatus:{},savedTicketPreview:{hidden:true,scrollIntoView(){}}};
+ const els={main:{querySelector:()=>null},saveImageStatus:{},savedTicketPreview:{hidden:true,scrollIntoView(){}}};
  const context={document:{getElementById:id=>els[id]},location:{search:'?c=MR'},URLSearchParams,navigator};
  const source=fs.readFileSync('public/resident.js','utf8').replace('  start();','  globalThis.hooks = {saveTicketImage, variantStores};');
  vm.runInNewContext(source,context);return {hooks:context.hooks,els};
@@ -12,12 +12,12 @@ test('variant store names are filtered per variant and escaped',()=>{
 test('save opens native image sharing with the prepared file',async()=>{
  const file={type:'image/png'};let shared;
  const {hooks,els}=load({canShare:()=>true,share:data=>{shared=data.files[0];return Promise.resolve();}});
- await hooks.saveTicketImage(file);assert.equal(shared,file);assert.equal(els.savedTicketPreview.hidden,false);assert.doesNotMatch(els.saveImageStatus.textContent,/successfully saved/i);
+ await hooks.saveTicketImage(file);assert.equal(shared,file);assert.equal(els.savedTicketPreview.hidden,true);assert.doesNotMatch(els.saveImageStatus.textContent,/successfully saved/i);
 });
-test('unsupported sharing and cancelled/failed share keep the saveable image visible',async()=>{
+test('unsupported sharing uses a fallback; cancelled sharing does not duplicate the QR',async()=>{
  for(const name of ['unsupported','AbortError','NotAllowedError']){
  const {hooks,els}=load({canShare:()=>name!=='unsupported',share:()=>Promise.reject(Object.assign(new Error(),{name}))});
- await hooks.saveTicketImage({});assert.equal(els.savedTicketPreview.hidden,false);assert.match(els.saveImageStatus.textContent,/hold the image/);
+ await hooks.saveTicketImage({});assert.equal(els.savedTicketPreview.hidden,name==='AbortError');assert.match(els.saveImageStatus.textContent,name==='AbortError'?/screenshot/:/hold the image/);
  }
 });
 
@@ -46,4 +46,11 @@ test('separate exports keep the QR ticket and products/stores apart',()=>{
  assert.match(qr,/MR-PREVIEW/);assert.doesNotMatch(qr,/WHERE TO BUY|LJL Poultry/);
  assert.match(products,/WHERE TO BUY/);assert.match(products,/LJL Poultry Supply/);assert.match(products,/119 Evangelista St/);assert.match(products,/NutriChunks Maintenance Small Breeds/);assert.doesNotMatch(products,/MR-PREVIEW|Show this QR/);
  const html=fs.readFileSync('public/index.html','utf8').split('<template id="ticketTpl">')[1].split('</template>')[0];assert.doesNotMatch(html,/id="applicableProducts"|id="buyBox"/);
+});
+
+
+test('another registration needs neither an image download nor a redeemed sample',()=>{
+ let target;const context={document:{getElementById:()=>({})},URL,URLSearchParams,location:{search:'?c=AR',href:'https://example.com/?c=AR',assign:url=>target=url},localStorage:{removeItem(){throw new Error('storage unavailable');}}};
+ vm.runInNewContext(fs.readFileSync('public/resident.js','utf8').replace('  start();','  globalThis.next = startAnotherRegistration;'),context);
+ context.next({condoId:'AR',status:'PRE_REGISTERED'});assert.equal(new URL(target).searchParams.get('new'),'1');assert.equal(new URL(target).searchParams.get('c'),'AR');
 });

@@ -278,23 +278,38 @@
       button.onclick = function() { prepareTicketImage(t, productsOnly); };
     });
   }
+  function showSavePreview() {
+    var preview = $('savedTicketPreview'), ticket = main.querySelector('.ticket');
+    preview.hidden = false;
+    // The fallback replaces the on-screen ticket instead of showing a second QR.
+    if (ticket) {
+      ticket.hidden = true;
+      var back = $('closeSavePreview');
+      if (!back) {
+        back = document.createElement('button'); back.id = 'closeSavePreview';
+        back.type = 'button'; back.className = 'linkBtn'; back.textContent = 'Back to my ticket';
+        preview.prepend(back);
+      }
+      back.onclick = function() { preview.hidden = true; ticket.hidden = false; startPanelAtTop(); };
+    }
+    preview.scrollIntoView({behavior:'smooth', block:'start'});
+  }
   async function saveTicketImage(file) {
     var status = $('saveImageStatus'), preview = $('savedTicketPreview');
-    preview.hidden = false;
     try {
       // Prepared before the tap so the native share sheet retains user activation.
       if (file && navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
         await navigator.share({files:[file]});
-        status.textContent = 'If you chose Save Image / Photos, check your gallery. Otherwise, touch and hold the image below for saving options.';
+        status.textContent = 'If you chose Save Image / Photos, check your gallery. You can also take a screenshot of your ticket.';
         return;
       }
     } catch (e) {
-      status.textContent = e.name === 'AbortError' ? 'Save menu closed. You can try again or touch and hold the image below.' : 'Touch and hold the image below, then choose the available image-saving option.';
-      preview.scrollIntoView({behavior:'smooth', block:'start'});
+      status.textContent = e.name === 'AbortError' ? 'Save menu closed. You can try again or take a screenshot of your ticket.' : 'Touch and hold the image below, then choose the available image-saving option.';
+      if (e.name !== 'AbortError') showSavePreview();
       return;
     }
     status.textContent = 'Touch and hold the image below and choose Save Image / Save to Photos if offered. On a computer, right-click to save. Saving options depend on your browser.';
-    preview.scrollIntoView({behavior:'smooth', block:'start'});
+    showSavePreview();
   }
 
   // Product claims checked against San Miguel Pet Care variant pages.
@@ -367,10 +382,18 @@
     again.innerHTML = '<button type="button" class="linkBtn" id="another">Registering someone else on this phone? Tap here</button>';
     main.appendChild(again);
     $("another").onclick = function () {
-      if (!confirm("Register another person on this phone? (Please make sure this free pack has been received first.)")) return;
-      try { localStorage.removeItem(TICKET_KEY); } catch (e) { }
-      location.reload();
+      again.innerHTML = '<p class="helper">Keep a screenshot or saved copy of this QR ticket before continuing. You do not need to claim the sample first.</p><button type="button" id="continueAnother" class="btn primary">I have my screenshot or ticket — Continue</button><button type="button" id="cancelAnother" class="linkBtn">Back to my ticket</button>';
+      $('continueAnother').onclick = function() { startAnotherRegistration(t); };
+      $('cancelAnother').onclick = function() { showTicket(t); };
     };
+  }
+
+  function startAnotherRegistration(t) {
+    try { localStorage.removeItem(TICKET_KEY); } catch (e) { }
+    var next = new URL(location.href);
+    next.searchParams.set('c', t.condoId || condoId);
+    next.searchParams.set('new', '1');
+    location.assign(next.href);
   }
 
   async function refreshTicket(t) {
@@ -513,7 +536,13 @@
   }
 
   async function start() {
-    var t = loadTicket();
+    var fresh = new URLSearchParams(location.search).get('new') === '1';
+    var t = fresh ? null : loadTicket();
+    if (fresh) {
+      try { localStorage.removeItem(TICKET_KEY); } catch (e) { }
+      var cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('new');
+      history.replaceState(null, '', cleanUrl.href);
+    }
     if (t && t.code && (!condoId || t.condoId === condoId)) { $("condoLine").textContent = t.condoName || ""; return refreshTicket(t); }
     if (!condoId) { main.innerHTML = '<div class="errbox">Please scan the QR code at the booth to register.</div>'; return; }
     try { info = await api("/api/condo?c=" + encodeURIComponent(condoId)); }
