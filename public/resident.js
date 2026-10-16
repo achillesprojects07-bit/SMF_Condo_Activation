@@ -100,18 +100,6 @@
   }
   function variantIds(t) { return (t.samples || []).concat(t.unavailableSamples || []).map(function (s) { return s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }); }
   function storeAddress(st) { return [st.address, st.city].filter(Boolean).join(", "); }
-  function renderStores(t) {
-    var stores = t.stores || [], box = $("buyBox");
-    if (!box || !stores.length) return;
-    box.hidden = false;
-    $("buySub").textContent = "Stores near " + (t.condoName || "your condo");
-    $("buyList").innerHTML = stores.map(function (st, i) {
-      var tags = (st.has || []).map(function (id) { return '<span class="tag ' + ((VARIANT[id] || {}).cls || "") + '">' + esc(variantLabel(id, t)) + "</span>"; }).join("");
-      var map = st.map || ("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(st.name + " " + storeAddress(st)));
-      return '<div class="store"><div class="pin">' + (i + 1) + '</div><div><div class="storeName">' + esc(st.name) + '</div><div class="storeAddr">' + esc(storeAddress(st)) + "</div>" +
-        (tags ? '<div class="storeTags">' + tags + "</div>" : "") + '<a class="mapLink" target="_blank" rel="noopener" href="' + esc(map) + '">Open in Maps →</a></div></div>';
-    }).join("");
-  }
   /** Draws the "Where to buy near you" panel; returns its height. measure = true only measures. */
   function drawStoresPanel(ctx, t, top, W, measure) {
     var stores = t.stores || []; if (!stores.length) return 0;
@@ -344,7 +332,6 @@
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     prepareTicketImage(t);
     showApplicableProducts(t,false);
-    renderStores(t);
     $('viewFeatures').onclick=function(){window.scrollTo(0,0);showRecommendations(t);};
     if (t.status === "CLAIMED") main.querySelector(".redeemPrompt").textContent = "Your freebie has already been redeemed.";
     var box = main.querySelector(".ticket");
