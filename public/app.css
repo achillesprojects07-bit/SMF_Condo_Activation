@@ -161,4 +161,15 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .tkTop.tkBrand{font-size:clamp(15px,5.4vw,24px);font-weight:900;line-height:1.15;color:var(--ink);white-space:nowrap}
 .tkBrand .tkOr{color:var(--ink)}
 
-.variantStores{margin-top:16px;padding-top:12px;border-top:1px solid #e8edf2;text-align:left}.variantStores h3{color:#0066b3;font-size:16px}.variantStores ul{padding-left:20px;margin:8px 0}.variantStores li{margin:8px 0;line-height:1.5}
+/* Prominent nearby stores, shared by recommendation and ticket screens. */
+.buy,.variantStores{margin-top:20px;border:2px solid var(--smfBlue);border-radius:16px;padding:0;background:#f1f8ff;overflow:hidden;text-align:left}
+.buyHeader{background:var(--smfBlue);color:#fff;padding:17px 16px}
+.buyTitle,.variantStores .buyHeader h3{font-size:24px;font-weight:900;line-height:1.2;letter-spacing:.3px;color:#fff;margin:0}
+.buySub,.variantStores .buyHeader p{font-size:14px;font-weight:400;line-height:1.5;color:#fff;margin:6px 0 0}
+#buyList,.variantStores ul{padding:0 16px;margin:0;list-style:none}
+.variantStores li,.buy .store{display:flex;gap:11px;align-items:flex-start;padding:16px 0;margin:0;border-top:1px solid #cee0ef;line-height:1.45}
+.variantStores li:first-child,.buy .store:first-child{border-top:0}
+.storeMarker{flex:0 0 23px;font-size:22px;line-height:1.3}
+.variantStores li>div,.buy .store>div:last-child{min-width:0;overflow-wrap:anywhere}
+.variantStores .storeName,.buy .storeName{font-size:16px;font-weight:800;color:#1c2733;line-height:1.45}
+.variantStores .storeAddr,.buy .storeAddr{font-size:14px;font-weight:400;color:#66717d;margin-top:4px;line-height:1.5}

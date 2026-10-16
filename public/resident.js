@@ -104,8 +104,7 @@
     var stores = t.stores || [], box = $("buyBox");
     if (!box || !stores.length) return;
     box.hidden = false;
-    var names = variantIds(t).map(function (id) { return variantLabel(id, t); });
-    $("buySub").textContent = "Stores near " + (t.condoName || "your condo") + (names.length ? " that sell " + names.join(" and ") + "." : ".");
+    $("buySub").textContent = "Stores near " + (t.condoName || "your condo");
     $("buyList").innerHTML = stores.map(function (st, i) {
       var tags = (st.has || []).map(function (id) { return '<span class="tag ' + ((VARIANT[id] || {}).cls || "") + '">' + esc(variantLabel(id, t)) + "</span>"; }).join("");
       var map = st.map || ("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(st.name + " " + storeAddress(st)));
@@ -123,9 +122,17 @@
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     var names = variantIds(t).map(function (id) { return variantLabel(id, t); });
     var startY = y;
-    y += 30; f(42, 900); if (!measure) { ctx.fillStyle = "#0066b3"; ctx.fillText("Where to buy near you", pad + 28, y); } y += 58;
-    f(26, 500); wrapLines(names.length ? "Get your " + names.join(" and ") + " at these stores near " + (t.condoName || "you") + ":" : "Stores near " + (t.condoName || "you") + ":", inner - 56).forEach(function (l) { if (!measure) { ctx.fillStyle = "#475467"; ctx.fillText(l, pad + 28, y); } y += 36; });
-    y += 12;
+    f(28, 500);
+    var subLines = wrapLines("Stores near " + (t.condoName || "you"), inner - 56);
+    var headerH = 118 + subLines.length * 38;
+    if (!measure) {
+      var panelH = drawStoresPanel(ctx, t, top, W, true) - 56;
+      rr(pad, startY, inner, panelH, 28, "#f1f8ff");
+      rr(pad, startY, inner, headerH, 28, "#0066b3");
+    }
+    y += 28; f(50, 900); if (!measure) { ctx.fillStyle = "#fff"; ctx.fillText("WHERE TO BUY", pad + 28, y); } y += 66;
+    f(28, 500); subLines.forEach(function (l) { if (!measure) { ctx.fillStyle = "#fff"; ctx.fillText(l, pad + 28, y); } y += 38; });
+    y = startY + headerH + 24;
     stores.forEach(function (st, i) {
       var tx = pad + 28 + 74, tw = inner - 56 - 74, row = y;
       f(32, 800); var nl = wrapLines(st.name, tw); f(26, 400); var al = wrapLines(storeAddress(st), tw);
@@ -134,7 +141,7 @@
         ctx.beginPath(); ctx.arc(pad + 28 + 26, row + 26, 26, 0, Math.PI * 2); ctx.fillStyle = "#0066b3"; ctx.fill();
         f(28, 900); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(String(i + 1), pad + 28 + 26, row + 11); ctx.textAlign = "left";
         var yy = row; f(32, 800); ctx.fillStyle = "#1c2733"; nl.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 40; });
-        f(26, 400); ctx.fillStyle = "#475467"; al.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 34; });
+        f(26, 400); ctx.fillStyle = "#66717d"; al.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 34; });
         var gx = tx; (st.has || []).forEach(function (id) {
           var c = VARIANT[id] || { bg: "#eef5fb", line: "#0066b3", ink: "#0066b3" }, label = variantLabel(id, t); f(21, 800);
           var w = ctx.measureText(label).width + 28; if (gx + w > tx + tw) return;
@@ -304,9 +311,9 @@
   function variantStores(t, id) {
     var stores = (t.stores || []).filter(function(st) { return (st.has || []).indexOf(id) >= 0; });
     if (!stores.length) return '';
-    return '<div class="variantStores"><h3>Where to buy near '+esc(t.condoName || 'you')+'</h3><ul>'+stores.map(function(st) {
-      return '<li>'+esc(st.name)+'</li>';
-    }).join('')+'</ul></div>';
+    return '<section class="variantStores"><div class="buyHeader"><h3>WHERE TO BUY</h3><p>Stores near '+esc(t.condoName || 'you')+'</p></div><ul>'+stores.map(function(st) {
+      return '<li><span class="storeMarker" aria-hidden="true">📍</span><div><div class="storeName">'+esc(st.name)+'</div><div class="storeAddr">'+esc(storeAddress(st))+'</div></div></li>';
+    }).join('')+'</ul></section>';
   }
   function showApplicableProducts(t, features) {
     var available = (t.samples || []).map(function(s) {return s.id;});
