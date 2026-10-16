@@ -20,3 +20,15 @@ test('unsupported sharing and cancelled/failed share keep the saveable image vis
  await hooks.saveTicketImage({});assert.equal(els.savedTicketPreview.hidden,false);assert.match(els.saveImageStatus.textContent,/hold the image/);
  }
 });
+
+
+test('recommendations reset scroll after rendering and again on the next frame',()=>{
+ const events=[],frames=[];
+ const els={main:{querySelector:()=>({setAttribute(){},focus:opts=>{assert.equal(opts.preventScroll,true);events.push('focus');}})},applicableProducts:{},viewTicket:{}};
+ Object.defineProperty(els.main,'innerHTML',{set(){events.push('render');}});
+ const context={document:{getElementById:id=>els[id]},location:{search:''},URLSearchParams,
+   window:{scrollTo:opts=>{assert.equal(opts.top,0);events.push('top');}},requestAnimationFrame:fn=>frames.push(fn)};
+ vm.runInNewContext(fs.readFileSync('public/resident.js','utf8').replace('  start();','  globalThis.show = showRecommendations;'),context);
+ context.show({samples:[]});assert.deepEqual(events,['render','focus','top']);
+ frames[0]();assert.deepEqual(events,['render','focus','top','top']);
+});

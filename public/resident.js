@@ -316,10 +316,21 @@
     }).join("");
   }
 
+  function startPanelAtTop() {
+    // Reset after rendering: scrolling the old form lets browser anchoring
+    // carry its bottom position into the new, shorter recommendations page.
+    var heading = main.querySelector('h1');
+    if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({preventScroll:true}); }
+    window.scrollTo({top:0, left:0, behavior:'instant'});
+    requestAnimationFrame(function() {
+      window.scrollTo({top:0, left:0, behavior:'instant'});
+    });
+  }
   function showRecommendations(t) {
     main.innerHTML='<section><h1>Your pet’s recommended variants</h1><p>Explore the key features, then open and save your claim ticket.</p><section id="applicableProducts" class="applicableProducts" aria-label="Your applicable products and quick features"></section><button type="button" id="viewTicket" class="btn saveImage">VIEW MY QR TICKET</button></section>';
     showApplicableProducts(t,true);
-    $('viewTicket').onclick=function(){window.scrollTo(0,0);showTicket(t);};
+    $('viewTicket').onclick=function(){showTicket(t);startPanelAtTop();};
+    startPanelAtTop();
   }
 
   function showTicket(t) {
@@ -336,7 +347,7 @@
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     prepareTicketImage(t);
     showApplicableProducts(t,false);
-    $('viewFeatures').onclick=function(){window.scrollTo(0,0);showRecommendations(t);};
+    $('viewFeatures').onclick=function(){showRecommendations(t);};
     if (t.status === "CLAIMED") main.querySelector(".redeemPrompt").textContent = "Your freebie has already been redeemed.";
     var box = main.querySelector(".ticket");
     if (t.status === "CLAIMED") {
@@ -485,7 +496,6 @@
     if (r.ok && r.ticket) {
       r.ticket.regId = regId;
       saveTicket(r.ticket);
-      window.scrollTo(0, 0);
       showRecommendations(r.ticket);
       return;
     }

@@ -173,3 +173,6 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 .variantStores li>div,.buy .store>div:last-child{min-width:0;overflow-wrap:anywhere}
 .variantStores .storeName,.buy .storeName{font-size:16px;font-weight:800;color:#1c2733;line-height:1.45}
 .variantStores .storeAddr,.buy .storeAddr{font-size:14px;font-weight:400;color:#66717d;margin-top:4px;line-height:1.5}
+
+/* New panels must not inherit the previous form’s bottom scroll anchor. */
+#main{overflow-anchor:none}
