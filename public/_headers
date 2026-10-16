@@ -1,0 +1,8 @@
+/
+  Cache-Control: no-store
+/index.html
+  Cache-Control: no-store
+/resident.js
+  Cache-Control: no-cache, must-revalidate
+/app.css
+  Cache-Control: no-cache, must-revalidate
