@@ -176,3 +176,5 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 
 /* New panels must not inherit the previous form’s bottom scroll anchor. */
 #main{overflow-anchor:none}
+
+.petFieldTitle{display:block;font-size:18px;font-weight:800;line-height:1.4;margin-bottom:6px;color:var(--ink)}
