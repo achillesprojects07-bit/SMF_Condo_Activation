@@ -178,3 +178,7 @@ label.lbl{display:block;font-size:15px;font-weight:800;margin:14px 0 6px}
 #main{overflow-anchor:none}
 
 .petFieldTitle{display:block;font-size:18px;font-weight:800;line-height:1.4;margin-bottom:6px;color:var(--ink)}
+
+.btn.saveProducts{display:block;width:100%;margin-top:20px;padding:22px 14px;border:3px solid #0066b3;border-radius:14px;background:#d9efff;color:#004d87;font-size:19px;font-weight:800;line-height:1.4;white-space:normal}
+.btn.saveProducts:hover:not(:disabled){background:#dceeff}
+.btn.saveProducts:focus-visible{outline:3px solid #0066b3;outline-offset:3px}
