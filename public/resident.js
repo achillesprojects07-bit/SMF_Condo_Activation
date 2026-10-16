@@ -168,10 +168,11 @@
     var h = Number(m[4]), ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
     return months[Number(m[2]) - 1] + " " + Number(m[3]) + ", " + m[1] + ", " + h + ":" + m[5] + " " + ap;
   }
-  function drawBrandedTicket(ctx, t, W, logo, shots, draw) {
+  function drawBrandedTicket(ctx, t, W, logo, shots, draw, productsOnly) {
     var pad = 64, inner = W - pad * 2, y = 64;
     ctx.textBaseline = "top"; ctx.textAlign = "center";
     if (logo) { var lh = 112, lw = logo.width * lh / logo.height; if (draw) ctx.drawImage(logo, (W - lw) / 2, y, lw, lh); y += lh + 28; }
+    if (!productsOnly) {
     // headline
     brandFont(ctx, 64, 900);
     var parts = [["FREE ", BRAND.green], ["NutriChunks", BRAND.orange], [" or ", BRAND.ink], ["Majesty", BRAND.purple]];
@@ -211,6 +212,7 @@
     if (t.status !== "CLAIMED" && eventDateLabel(t.date)) {
       brandFont(ctx, 30, 800); wrapText(ctx, claimNote(t), inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.blue; ctx.fillText(l, W / 2, y); } y += 42; }); y += 8;
     }
+    }
     // product shots
     if (shots.length) {
       y += 24; if (draw) { ctx.fillStyle = BRAND.line; ctx.fillRect(pad, y, inner, 3); } y += 34;
@@ -231,6 +233,11 @@
     // where to buy
     var storesH = drawStoresPanel(ctx, t, y, W, !draw); ctx.textAlign = "center"; ctx.textBaseline = "top";
     y += storesH ? storesH + 10 : 20;
+    if (productsOnly) {
+      brandFont(ctx, 24, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText(t.condoName || '', W / 2, y); } y += 42;
+      if (draw) ctx.fillText('© 2026 Slingshotz Advertising Inc.', W / 2, y);
+      return y + 70;
+    }
     // footer
     brandFont(ctx, 28, 700); wrapText(ctx, t.status === "CLAIMED" ? "This ticket has already been redeemed." : "Show this QR code to our NutriChunks & Majesty Pet Pals.", inner).forEach(function (l) { if (draw) { ctx.fillStyle = BRAND.ink; ctx.fillText(l, W / 2, y); } y += 40; });
     brandFont(ctx, 25, 400); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText("Available while supplies last. One free pack per mobile number.", W / 2, y); } y += 38;
@@ -239,35 +246,36 @@
     return y + 46;
   }
 
-  async function ticketWithProductShots(t) {
+  async function ticketWithProductShots(t, productsOnly) {
     var W = 1080, logo = await loadImg("smf-logo.png");
-    var shots = await Promise.all(ticketProducts(t).map(function (s) { return loadImg(productInfo[s.id].image).then(function (img) { return { img: img, title: productInfo[s.id].title }; }); }));
+    if (!productsOnly) t = Object.assign({}, t, {stores:[]});
+    var shots = await Promise.all((productsOnly ? ticketProducts(t) : []).map(function (s) { return loadImg(productInfo[s.id].image).then(function (img) { return { img: img, title: productInfo[s.id].title }; }); }));
     var probe = document.createElement("canvas").getContext("2d");
-    var H = Math.ceil(drawBrandedTicket(probe, t, W, logo, shots, false));
+    var H = Math.ceil(drawBrandedTicket(probe, t, W, logo, shots, false, productsOnly));
     var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     var ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
     rrect(ctx, 14, 14, W - 28, H - 28, 40, null, BRAND.blue, 14);
-    drawBrandedTicket(ctx, t, W, logo, shots, true);
+    drawBrandedTicket(ctx, t, W, logo, shots, true, productsOnly);
     return cv.toDataURL("image/png");
   }
-  function prepareTicketImage(t) {
+  function prepareTicketImage(t, productsOnly) {
     var button = $('saveImage'), status = $('saveImageStatus');
     button.disabled = true;
-    status.textContent = 'Preparing your ticket image…';
-    ticketWithProductShots(t).then(function(url) {
+    status.textContent = productsOnly ? 'Preparing your products and stores image…' : 'Preparing your ticket image…';
+    ticketWithProductShots(t, productsOnly).then(function(url) {
       if ($('saveImage') !== button) return;
       $('savedTicketImage').src = url;
       var raw = atob(url.split(',')[1]), bytes = new Uint8Array(raw.length);
       for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-      var file = typeof File === 'function' ? new File([bytes], 'SMF-Claim-' + String(t.code).replace(/[^A-Za-z0-9-]/g, '') + '.png', {type:'image/png'}) : null;
+      var file = typeof File === 'function' ? new File([bytes], (productsOnly ? 'SMF-Products-Stores-' : 'SMF-Claim-') + String(t.code).replace(/[^A-Za-z0-9-]/g, '') + '.png', {type:'image/png'}) : null;
       button.onclick = function() { saveTicketImage(file); };
       button.disabled = false;
-      status.textContent = 'Tap SAVE IMAGE, then choose Save Image / Photos if offered. You can also touch and hold the ticket image to save it.';
+      status.textContent = 'Tap the save button, then choose Save Image / Photos if offered.';
     }).catch(function() {
       if ($('saveImage') !== button) return;
-      status.textContent = 'The image could not be prepared. Tap to try again, or take a screenshot of your ticket.';
+      status.textContent = 'The image could not be prepared. Tap to try again.';
       button.disabled = false;
-      button.onclick = function() { prepareTicketImage(t); };
+      button.onclick = function() { prepareTicketImage(t, productsOnly); };
     });
   }
   async function saveTicketImage(file) {
@@ -327,8 +335,9 @@
     });
   }
   function showRecommendations(t) {
-    main.innerHTML='<section><h1>Your pet’s recommended variants</h1><p>Explore the key features, then open and save your claim ticket.</p><section id="applicableProducts" class="applicableProducts" aria-label="Your applicable products and quick features"></section><button type="button" id="viewTicket" class="btn saveImage">VIEW MY QR TICKET</button></section>';
+    main.innerHTML='<section><h1>Your pet’s recommended variants</h1><p>Explore the key features, then open and save your claim ticket.</p><section id="applicableProducts" class="applicableProducts" aria-label="Your applicable products and quick features"></section><button type="button" id="saveImage" class="btn secondary">SAVE PRODUCTS &amp; STORES IMAGE</button><div id="saveImageStatus" class="helper center" role="status" aria-live="polite"></div><div id="savedTicketPreview" hidden><p class="helper center">Touch and hold the image to save it to Photos if offered.</p><img id="savedTicketImage" class="photoPrev" alt="Your applicable products and nearby stores"></div><button type="button" id="viewTicket" class="btn saveImage">VIEW MY QR TICKET</button></section>';
     showApplicableProducts(t,true);
+    prepareTicketImage(t,true);
     $('viewTicket').onclick=function(){showTicket(t);startPanelAtTop();};
     startPanelAtTop();
   }
@@ -346,7 +355,6 @@
     $("tkMeta").textContent = (t.condoName || "") + " • Registered " + registeredLabel(t);
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     prepareTicketImage(t);
-    showApplicableProducts(t,false);
     $('viewFeatures').onclick=function(){showRecommendations(t);};
     if (t.status === "CLAIMED") main.querySelector(".redeemPrompt").textContent = "Your freebie has already been redeemed.";
     var box = main.querySelector(".ticket");
