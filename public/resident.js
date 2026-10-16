@@ -126,8 +126,12 @@
       f(32, 800); var nl = wrapLines(st.name, tw); f(26, 400); var al = wrapLines(storeAddress(st), tw);
       var h = nl.length * 40 + al.length * 34 + ((st.has || []).length ? 54 : 0) + 22;
       if (!measure) {
-        ctx.beginPath(); ctx.arc(pad + 28 + 26, row + 26, 26, 0, Math.PI * 2); ctx.fillStyle = "#0066b3"; ctx.fill();
-        f(28, 900); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(String(i + 1), pad + 28 + 26, row + 11); ctx.textAlign = "left";
+        var pinX = pad + 54, pinY = row + 24;
+        ctx.beginPath(); ctx.arc(pinX, pinY, 24, Math.PI, 0);
+        ctx.bezierCurveTo(pinX + 24, pinY + 20, pinX + 10, pinY + 31, pinX, pinY + 46);
+        ctx.bezierCurveTo(pinX - 10, pinY + 31, pinX - 24, pinY + 20, pinX - 24, pinY);
+        ctx.closePath(); ctx.fillStyle = "#0066b3"; ctx.fill();
+        ctx.beginPath(); ctx.arc(pinX, pinY, 9, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
         var yy = row; f(32, 800); ctx.fillStyle = "#1c2733"; nl.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 40; });
         f(26, 400); ctx.fillStyle = "#66717d"; al.forEach(function (l) { ctx.fillText(l, tx, yy); yy += 34; });
         var gx = tx; (st.has || []).forEach(function (id) {
