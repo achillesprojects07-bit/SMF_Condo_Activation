@@ -6,3 +6,10 @@
   Cache-Control: no-cache, must-revalidate
 /app.css
   Cache-Control: no-cache, must-revalidate
+
+/pm.html
+  Cache-Control: no-store
+/pm.js
+  Cache-Control: no-cache, must-revalidate
+/pm-model.js
+  Cache-Control: no-cache, must-revalidate

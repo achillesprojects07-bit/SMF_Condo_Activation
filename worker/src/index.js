@@ -230,6 +230,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) return handleApi(request, env);
     if (url.pathname === "/ba") return Response.redirect(url.origin + "/ba.html", 302);
+    if (url.pathname === "/pm") return Response.redirect(url.origin + "/pm.html", 302);
     if (url.pathname === "/report") return Response.redirect(url.origin + "/report.html", 302);
     return env.ASSETS.fetch(request);
   }

@@ -44,3 +44,9 @@ The ticket photo is stored in the existing PHOTO_URL column. PHOTO_CONSENT is YE
 Out-of-stock attempts: the BA stock list labels depleted variants OOS. Ticket lookup disables release for unavailable variants. BAs record a customer attempted redemption using “Record customer tried — OOS” and select the missing variant(s). The claim log saves RESULT=OOS, PRODUCTS_UNAVAILABLE, BA, and timestamps, with no PRODUCTS_GIVEN, no claimed status, and no stock deduction. The server also rechecks stock under the claim lock and records OOS instead of releasing depleted stock. Records & photos shows OOS attempts separately; training remains excluded.
 
 Resident profiles require a pet photo, using camera or gallery. Images are resized to JPEG before upload. A shared group photo is stored once per registration, and every pet retains its own photo link in DOG_PROFILES/CAT_PROFILES. Raw photo data is not stored in Sheets. Photo failures block registration. Registration retries reuse the same REG_ID. All customer-facing labels and messages are English.
+
+## PM monitor
+
+Open `/pm.html` (or `/pm`) to monitor sign-ups and completed claims. It uses the existing report access code and protected report API; no BA login is required. Defaults to today's Manila event date, with condo/date filters and automatic refresh once per minute while visible. Failed refreshes retain the last successful view and display a stale-data warning. Sign out clears the PM session.
+
+Event totals include advance registrations. Hourly movement uses actual Manila registration/claim timestamps for the selected event date. Completed claims and pack totals come from each registration's final status, so duplicate redemption attempts do not inflate totals. Pending means unclaimed tickets, not a physical queue. Demo/training exclusions remain enforced by the existing report backend.
