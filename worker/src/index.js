@@ -58,6 +58,20 @@ export async function gateway(env, action, payload, fetchImpl = fetch) {
   }
 }
 
+
+// Explicit closing deadlines for the October 24 events, matching SCHEDULE.
+// Compare the gateway's active event date so later events at the same condo stay independent.
+export function applyRegistrationClosing(info, condoId, now = Date.now()) {
+  const id = String(condoId || info?.condo?.id || "").trim().toUpperCase();
+  const eventDate = info?.eventDate || (info?.running ? info.date : "");
+  if (!info?.ok || !["RP", "PG"].includes(id) || eventDate !== "2026-10-24") return info;
+  const registrationClosesAt = "2026-10-24T17:00:00+08:00";
+  if (now < Date.parse(registrationClosesAt)) return { ...info, registrationClosesAt };
+  return { ...info, running: false, registrationOpen: false, preregistration: false,
+    registrationClosed: true, registrationClosesAt,
+    message: "Registration closed at 5 PM on October 24, 2026." };
+}
+
 /* ---------- signed tokens (HMAC-SHA256) ---------- */
 const enc = new TextEncoder();
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -132,7 +146,8 @@ export async function handleApi(request, env, deps = {}) {
   const ip = request.headers.get("CF-Connecting-IP") || "local";
   try {
     if (path === "/api/condo" && method === "GET") {
-      return json(await gw("condo", { condoId: url.searchParams.get("c") || "" }));
+      const condoId = url.searchParams.get("c") || "";
+      return json(applyRegistrationClosing(await gw("condo", { condoId }), condoId));
     }
 
     if (path === "/api/my-ticket" && method === "GET") {
@@ -154,6 +169,11 @@ export async function handleApi(request, env, deps = {}) {
         name: String(b.name || "").trim().slice(0, 80), mobile: String(b.mobile || "").slice(0, 20),
         petType: String(b.petType || "").toUpperCase(), dog: clean(b.dog), cat: clean(b.cat)
       };
+      if (["RP", "PG"].includes(payload.condoId.trim().toUpperCase()) &&
+          Date.now() >= Date.parse("2026-10-24T17:00:00+08:00")) {
+        const event = applyRegistrationClosing(await gw("condo", { condoId: payload.condoId }), payload.condoId);
+        if (event.registrationClosed) return json({ ok: false, error: "REGISTRATION_CLOSED", message: event.message }, 403);
+      }
       return json(await gw("register", payload));
     }
 
