@@ -7,7 +7,7 @@
 <title>FREE NutriChunks or Majesty</title>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="app.css?v=20261016-ticket-reminder">
+<link rel="stylesheet" href="app.css?v=20261022-autofill">
 </head>
 <body>
 <div class="app">
@@ -69,16 +69,18 @@
 
     <div id="youPart" hidden>
       <div class="partHead">About you</div>
+      <form id="youForm" autocomplete="on" novalidate>
       <section class="q" data-q="name">
-        <div class="qTitle">Your name</div>
-        <input id="name" class="big" maxlength="80" autocomplete="name" placeholder="Juan Dela Cruz">
+        <label class="qTitle" for="name">Your name</label>
+        <input id="name" name="name" type="text" class="big" maxlength="80" autocomplete="name" autocapitalize="words" placeholder="Juan Dela Cruz">
       </section>
       <section class="q" data-q="mobile">
-        <div class="qTitle">Mobile number</div>
-        <div class="qSub">One registration per mobile number</div>
-        <input id="mobile" class="big" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="09171234567">
+        <label class="qTitle" for="mobile">Mobile number</label>
+        <div class="qSub">One registration per mobile number. Tap the field to use your phone's saved number.</div>
+        <input id="mobile" name="tel" type="tel" class="big" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="09171234567">
         <div id="mobileHint" class="hint" hidden>Please enter 11 digits starting with 09.</div>
       </section>
+      </form>
       <section class="q" data-q="promo">
         <div class="qTitle">May we send you text messages about NutriChunks and Majesty promotions?</div>
         <div class="choices two" data-name="promo">
@@ -114,6 +116,6 @@
 </template>
 
 <script src="vendor/qrcode.js"></script>
-<script src="resident.js?v=20261016-ticket-reminder"></script>
+<script src="resident.js?v=20261022-autofill"></script>
 </body>
 </html>

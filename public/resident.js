@@ -509,7 +509,13 @@
         renderPets(n==='dogCount'?'dog':'cat');refresh();
       });
     });
-    main.querySelectorAll("input").forEach(function (i) { i.addEventListener("input", refresh); });
+    main.querySelectorAll("input").forEach(function (i) { i.addEventListener("input", refresh); i.addEventListener("change", refresh); });
+    // Phone autofill: accept the saved contact number (e.g. +63 917 123 4567) and show it as 09171234567.
+    var mob = $("mobile");
+    function tidyMobile() { var n = normMobile(mob.value); if (/^09\d{9}$/.test(n) && n !== mob.value) { mob.value = n; refresh(); } }
+    mob.addEventListener("change", tidyMobile); mob.addEventListener("blur", tidyMobile);
+    mob.addEventListener("input", function () { if (/^\+?63|\s/.test(mob.value) && /^09\d{9}$/.test(normMobile(mob.value))) tidyMobile(); });
+    var yf = $("youForm"); if (yf) yf.addEventListener("submit", function (e) { e.preventDefault(); });
     $("submit").onclick = submit;
     refresh();
   }

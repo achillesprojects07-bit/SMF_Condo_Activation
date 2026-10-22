@@ -23,7 +23,7 @@ body{margin:0;background:#f3f6f8;color:var(--ink);font-family:Inter,-apple-syste
 .q.bad{border-color:#d92d20;background:#fff5f4}
 .q.bad .qTitle::before{content:""}
 [hidden]{display:none!important}
-.qTitle{font-size:18px;font-weight:850;color:#101828;margin-bottom:10px;line-height:1.3}
+.qTitle{display:block;font-size:18px;font-weight:850;color:#101828;margin-bottom:10px;line-height:1.3}
 .q.answered .qTitle::before{content:"✓ ";color:var(--greenDark)}
 .qSub{font-size:14px;color:#475467;margin:-6px 0 10px}
 .privacy{font-size:14.5px;line-height:1.45;color:#344054;margin-bottom:12px;background:var(--soft);border-radius:12px;padding:12px}
