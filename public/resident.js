@@ -4,13 +4,48 @@
   var main = document.getElementById("main");
   var condoId = (new URLSearchParams(location.search).get("c") || "").trim().toUpperCase();
   var TICKET_KEY = "smfc_ticket_v1";
-  var state = { consent: "", petType: "", dogCount: 1, catCount: 1, dogAge: "", dogSize: "", dogBrand: "", catAge: "", catBrand: "", promo: "" };
+  var state = { consent: "", building: "", petType: "", dogCount: 1, catCount: 1, dogAge: "", dogSize: "", dogBrand: "", catAge: "", catBrand: "", promo: "" };
   var info = null;
   var profiles = {dog: [], cat: []}, pendingRegId = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : "r" + Date.now() + Math.random().toString(16).slice(2)); }
+  function placeLabel(t) { return t.residentCondo ? t.residentCondo + ", " + (t.condoName || "") : (t.condoName || ""); }
+  function needsBuilding() { return !!(info && info.condo && info.condo.buildings && info.condo.buildings.length); }
+  function sortKey(n) { return String(n).replace(/^the\s+/i, "").toLowerCase(); }
+  function setupBuilding() {
+    if (!needsBuilding()) return;
+    var q = $("buildingQ"), input = $("building"), list = $("buildingList"), active = 0;
+    var all = info.condo.buildings.slice().sort(function (a, b) { return sortKey(a) < sortKey(b) ? -1 : 1; });
+    q.hidden = false;
+    function matches(text) {
+      var w = text.trim().toLowerCase();
+      if (!w) return all;
+      return all.filter(function (n) { var l = n.toLowerCase(); return l.indexOf(w) === 0 || l.split(/\s+/).some(function (x) { return x.indexOf(w) === 0; }); });
+    }
+    function show() {
+      var m = matches(input.value); active = 0;
+      list.innerHTML = m.length ? m.map(function (n, i) { return '<button type="button" role="option" data-v="' + esc(n) + '"' + (i === 0 ? ' class="active"' : '') + '>' + esc(n) + '</button>'; }).join("") : '<div class="comboEmpty">No match. Please check the spelling.</div>';
+      list.hidden = false; input.setAttribute("aria-expanded", "true");
+    }
+    function hide() { list.hidden = true; input.setAttribute("aria-expanded", "false"); }
+    function pick(n) { state.building = n; input.value = n; hide(); refresh(); }
+    input.addEventListener("focus", show);
+    input.addEventListener("input", function () {
+      var exact = all.filter(function (n) { return n.toLowerCase() === input.value.trim().toLowerCase(); })[0];
+      state.building = exact || ""; show(); refresh();
+    });
+    input.addEventListener("keydown", function (e) {
+      var opts = list.querySelectorAll("button");
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { if (!opts.length) return; e.preventDefault(); opts[active].classList.remove("active"); active = (active + (e.key === "ArrowDown" ? 1 : opts.length - 1)) % opts.length; opts[active].classList.add("active"); opts[active].scrollIntoView({ block: "nearest" }); }
+      else if (e.key === "Enter") { e.preventDefault(); if (opts[active]) pick(opts[active].dataset.v); }
+      else if (e.key === "Escape") hide();
+    });
+    list.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    list.addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) pick(b.dataset.v); });
+    input.addEventListener("blur", function () { setTimeout(function () { hide(); if (!state.building) { var m = matches(input.value); if (input.value.trim().length >= 2 && m.length === 1) pick(m[0]); } }, 150); });
+  }
   function normMobile(v) {
     var d = String(v || "").replace(/[^0-9+]/g, "");
     if (/^\+639\d{9}$/.test(d)) return "0" + d.slice(3);
@@ -179,7 +214,7 @@
     var tw = parts.reduce(function (a, p) { return a + ctx.measureText(p[0]).width; }, 0), x = (W - tw) / 2;
     if (draw) { ctx.textAlign = "left"; parts.forEach(function (p) { ctx.fillStyle = p[1]; ctx.fillText(p[0], x, y); x += ctx.measureText(p[0]).width; }); ctx.textAlign = "center"; }
     y += 82;
-    brandFont(ctx, 32, 600); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText(t.condoName || "", W / 2, y); } y += 76;
+    brandFont(ctx, 32, 600); if (draw) { ctx.fillStyle = BRAND.muted; ctx.fillText(placeLabel(t), W / 2, y); } y += 76;
     // QR in a blue box
     var ids = (t.samples || []).map(function (s) { return s.id; });
     var q = qrcode(0, "M"); q.addData("SMFC1|" + t.code + "|" + ids.join(",")); q.make();
@@ -382,7 +417,7 @@
     html += (t.unavailableSamples || []).map(function (s) { return '<div class="sample none">' + esc(s.name) + ' — OUT OF STOCK</div>'; }).join("");
     if (t.noStock && !(t.unavailableSamples || []).length) html += '<div class="sample none">' + (ids.length ? "One of the packs" : "The pack") + " for your pet is out of stock today. Thank you for registering!</div>";
     $("tkSamples").innerHTML = html;
-    $("tkMeta").textContent = (t.condoName || "") + " • Registered " + registeredLabel(t);
+    $("tkMeta").textContent = placeLabel(t) + " • Registered " + registeredLabel(t);
     if(t.status !== 'CLAIMED' && eventDateLabel(t.date)) $('tkClaimNote').textContent=claimNote(t);
     prepareTicketImage(t);
     $('viewFeatures').onclick=function(){showRecommendations(t);};
@@ -461,23 +496,24 @@
     }).join('');
   }
   function answered() {
-    var a={consent:state.consent==='YES',petType:!!state.petType,name:$('name').value.trim().length>=2,mobile:/^09\d{9}$/.test(normMobile($('mobile').value)),promo:!!state.promo,dogCount:true,catCount:true};
+    var a={consent:state.consent==='YES',building:!needsBuilding()||!!state.building,petType:!!state.petType,name:$('name').value.trim().length>=2,mobile:/^09\d{9}$/.test(normMobile($('mobile').value)),promo:!!state.promo,dogCount:true,catCount:true};
     ['dog','cat'].forEach(function(pet){profiles[pet].forEach(function(p,i){a[pet+'Profile'+i]=!!profileValid(p,pet);});});return a;
   }
   function refresh() {
     var a=answered();main.querySelectorAll('.q').forEach(function(q){q.classList.toggle('answered',!!a[q.dataset.q]);q.classList.remove('bad');});
-    $('noConsent').hidden=state.consent!=='NO';$('afterConsent').hidden=state.consent!=='YES';
+    $('noConsent').hidden=state.consent!=='NO';$('afterConsent').hidden=state.consent!=='YES';$('petTypeQ').hidden=needsBuilding()&&!state.building&&!state.petType;
     $('dogPart').hidden=state.petType!=='DOG'&&state.petType!=='BOTH';$('catPart').hidden=state.petType!=='CAT'&&state.petType!=='BOTH';$('youPart').hidden=!state.petType;
     var m=$('mobile').value.trim();$('mobileHint').hidden=!m||a.mobile||m.replace(/\D/g,'').length<10;
   }
   function missing() {
-    var a=answered(),need=['consent','petType','name','mobile','promo'];
+    var a=answered(),need=['consent'].concat(needsBuilding()?['building']:[],['petType','name','mobile','promo']);
     ['dog','cat'].forEach(function(pet){if(state.petType===pet.toUpperCase()||state.petType==='BOTH')profiles[pet].forEach(function(p,i){need.push(pet+'Profile'+i);});});return need.filter(function(k){return !a[k];});
   }
 
   function buildForm() {
     main.innerHTML = $("formTpl").innerHTML;
     renderPets('dog');renderPets('cat');
+    setupBuilding();
     function profileInput(e) {
       var t=e.target;
       if(!t.dataset.pet || t.dataset.photo)return;
@@ -539,7 +575,7 @@
     var regId = pendingRegId || (pendingRegId = uuid());
     var payload = {
       condoId: condoId, regId: regId, consent: "YES", promoOptIn: state.promo,
-      name: $("name").value.trim(), mobile: normMobile($("mobile").value), petType: state.petType,
+      building: state.building, name: $("name").value.trim(), mobile: normMobile($("mobile").value), petType: state.petType,
       dog: petPayload('dog'), cat: petPayload('cat')
     };
     var r;
@@ -553,6 +589,7 @@
     }
     btn.disabled = false; btn.textContent = "Get my FREE NutriChunks / Majesty";
     err.hidden = false; err.textContent = r.message || "Your registration was not saved. Please try again.";
+    if (r.error === "BAD_BUILDING") main.querySelector('.q[data-q="building"]').classList.add("bad");
     if (r.error === "ALREADY_REGISTERED" || r.error === "BAD_MOBILE") main.querySelector('.q[data-q="mobile"]').classList.add("bad");
   }
 

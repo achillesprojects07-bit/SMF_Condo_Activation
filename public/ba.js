@@ -253,7 +253,7 @@
         $("warn").innerHTML = '<div class="errbox">' + esc(r.message || "Walang ganitong ticket.") + " Huwag ibigay ang sample.</div>";
       } else {
         var t = r.ticket;
-        $("tinfo").innerHTML = "<b>" + esc(t.petNames) + "</b> • " + esc(t.name) + "<br>" + esc(t.condoName) + " • " + esc(t.registeredAt);
+        $("tinfo").innerHTML = "<b>" + esc(t.petNames) + "</b> • " + esc(t.name) + "<br>" + esc(t.condoName) + (t.residentCondo ? " (" + esc(t.residentCondo) + ")" : "") + " • " + esc(t.registeredAt);
         if (t.status === "CLAIMED") {
           blocked = true;
           $("warn").innerHTML = '<div class="errbox">NA-CLAIM NA ito (' + esc(t.claimedAt) + ", " + esc(t.claimedBy) + "). Huwag nang ibigay ulit.</div>";

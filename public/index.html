@@ -7,7 +7,7 @@
 <title>FREE NutriChunks or Majesty</title>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="app.css?v=20261022-autofill">
+<link rel="stylesheet" href="app.css?v=20261022-compound">
 </head>
 <body>
 <div class="app">
@@ -40,7 +40,15 @@
   </section>
 
   <div id="afterConsent" hidden>
-    <section class="q" data-q="petType">
+    <section class="q" data-q="building" id="buildingQ" hidden>
+      <label class="qTitle" for="building">Which condominium do you live in?</label>
+      <div class="qSub">Type the first two letters, then tap your condominium.</div>
+      <div class="combo">
+        <input id="building" class="big" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="buildingList" placeholder="Tap to choose or start typing">
+        <div id="buildingList" class="comboList" role="listbox" aria-label="Condominiums" hidden></div>
+      </div>
+    </section>
+    <section class="q" data-q="petType" id="petTypeQ">
       <div class="qTitle">Do you have a dog or a cat?</div>
       <div class="choices three" data-name="petType">
         <button type="button" class="choice" data-v="DOG">🐶 Dog</button>
@@ -116,6 +124,6 @@
 </template>
 
 <script src="vendor/qrcode.js"></script>
-<script src="resident.js?v=20261022-autofill"></script>
+<script src="resident.js?v=20261022-compound"></script>
 </body>
 </html>

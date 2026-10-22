@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.5-pet-profile-photos';
+var VERSION = '1.6-compound-buildings';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -24,10 +24,17 @@ var TABLES = {
     'CONSENT', 'PROMO_OPT_IN', 'RESIDENT_NAME', 'MOBILE', 'PET_TYPE',
     'DOG_COUNT', 'DOG_NAMES', 'DOG_AGE', 'DOG_SIZE', 'DOG_BRAND',
     'CAT_COUNT', 'CAT_NAMES', 'CAT_AGE', 'CAT_BRAND',
-    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE', 'DOG_PROFILES', 'CAT_PROFILES', 'DOG_BRAND_REASON', 'CAT_BRAND_REASON', 'SAMPLE_PRODUCTS', 'UNAVAILABLE_SAMPLES'],
+    'SAMPLE_DOG', 'SAMPLE_CAT', 'STATUS', 'CLAIMED_AT', 'CLAIMED_BY', 'SAMPLES_GIVEN', 'PHOTO_URL', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'DATA_TYPE', 'DOG_PROFILES', 'CAT_PROFILES', 'DOG_BRAND_REASON', 'CAT_BRAND_REASON', 'SAMPLE_PRODUCTS', 'UNAVAILABLE_SAMPLES', 'RESIDENT_CONDO'],
   REDEMPTIONS: ['REDEMPTION_ID', 'CLAIM_CODE', 'DATE', 'CONDO_ID', 'STAFF_CODE', 'BA_NAME',
     'PRODUCTS_GIVEN', 'RESULT', 'PHOTO_URL', 'PHOTO_FILE_ID', 'PHONE_SAVED_AT', 'SERVER_SAVED_AT', 'NOTE', 'PHOTO_CONSENT', 'CUSTOMER_PHOTO_URL', 'CUSTOMER_PHOTO_FILE_ID', 'DATA_TYPE', 'PRODUCTS_UNAVAILABLE', 'ATTEMPT_TYPE']
 };
+
+// QR codes that serve a whole compound: residents pick their own condominium (stored in RESIDENT_CONDO).
+var COMPOUND_BUILDINGS = {
+  RP: ['Alder Residences', 'Cedar Crest', 'Ivory Wood', 'Maple Place', 'Mulberry Place', 'Rainbow Ridge Condominiums',
+       'Rosewood Pointe', 'Royal Palm Residences', 'The Birchwood', 'Verawood Residences']
+};
+function buildingsFor_(condoId) { return COMPOUND_BUILDINGS[String(condoId || '').trim().toUpperCase()] || []; }
 
 var PRODUCT_SEED = [
   ['NC_PUPPY_LAMB', 'NutriChunks Puppy Lamb 150g', 'DOG', 'Puppy'],
@@ -252,7 +259,7 @@ function condoInfo_(p) {
     .map(function (b) { return { brand: b.BRAND, petType: b.PET_TYPE.toUpperCase() }; });
   return {
     ok: true, date: date, running: runningToday_(condo.CONDO_ID, date), registrationOpen:!!event, eventDate:event ? event.date : '', preregistration:!!(event && event.advance),
-    condo: { id: condo.CONDO_ID, name: condo.CONDO_NAME, booth: condo.BOOTH_LOCATION },
+    condo: { id: condo.CONDO_ID, name: condo.CONDO_NAME, booth: condo.BOOTH_LOCATION, buildings: buildingsFor_(condo.CONDO_ID) },
     products: products_().map(function (x) { return { id: x.PRODUCT_ID, name: x.PRODUCT_NAME, petType: x.PET_TYPE }; }),
     brands: brands
   };
@@ -274,6 +281,12 @@ function register_(p) {
   if (!event) return { ok: false, error: 'NOT_TODAY', message: 'There is no sampling or open pre-registration at this condo today.' };
   var date = event.date;
   if (p.consent !== 'YES') return { ok: false, error: 'NO_CONSENT', message: 'Your privacy consent is needed to receive your free pack.' };
+  var buildings = buildingsFor_(condo.CONDO_ID), residentCondo = '';
+  if (buildings.length) {
+    var want = String(p.building || '').trim().toLowerCase();
+    residentCondo = buildings.filter(function (b) { return b.toLowerCase() === want; })[0] || '';
+    if (!residentCondo) return { ok: false, error: 'BAD_BUILDING', message: 'Please choose your condominium from the list.' };
+  }
   var mobile = normMobile_(p.mobile);
   if (!/^09\d{9}$/.test(mobile)) return { ok: false, error: 'BAD_MOBILE', message: 'Please enter a valid mobile number (e.g. 09171234567).' };
 
@@ -330,7 +343,7 @@ function register_(p) {
     CAT_COUNT: hasCat ? Number(cat.count) || 1 : '', CAT_NAMES: hasCat ? String(cat.names || '').slice(0, 2000) : '',
     CAT_AGE: hasCat ? String(cat.age || '') : '', CAT_BRAND: hasCat ? String(cat.brand || '').slice(0, 3000) : '',
     DOG_PROFILES: hasDog && dog.profiles ? JSON.stringify(dog.profiles) : '', CAT_PROFILES: hasCat && cat.profiles ? JSON.stringify(cat.profiles) : '', DOG_BRAND_REASON: hasDog ? String(dog.reason||'') : '', CAT_BRAND_REASON: hasCat ? String(cat.reason||'') : '',
-    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, SAMPLE_PRODUCTS: samples.join(', '), UNAVAILABLE_SAMPLES: unavailable.join(', '), STATUS: event.advance ? 'PRE_REGISTERED' : gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
+    SAMPLE_DOG: sampleDog, SAMPLE_CAT: sampleCat, SAMPLE_PRODUCTS: samples.join(', '), UNAVAILABLE_SAMPLES: unavailable.join(', '), RESIDENT_CONDO: residentCondo, STATUS: event.advance ? 'PRE_REGISTERED' : gotSome ? 'WAITING' : 'NO_STOCK', DATA_TYPE: trainingCondo_(condo.CONDO_ID) ? 'TRAINING' : 'LIVE'
   };
   append_('REGISTRATIONS', row);
   return { ok: true, ticket: ticketView_(row, condo) };
@@ -358,7 +371,7 @@ function ticketView_(r, condo) {
   return {
     code: r.CLAIM_CODE, date: r.DATE, registeredAt: r.REGISTERED_AT, status: r.STATUS,
     condoId: r.CONDO_ID, condoName: (condo && condo.CONDO_NAME) || r.CONDO_NAME, booth:condo ? condo.BOOTH_LOCATION || '' : '',
-    name: r.RESIDENT_NAME, petType: r.PET_TYPE,
+    name: r.RESIDENT_NAME, petType: r.PET_TYPE, residentCondo: r.RESIDENT_CONDO || '',
     petNames: [r.DOG_NAMES, r.CAT_NAMES].filter(String).join(', '),
     samples: samples.map(function (id) { return { id: id, name: names[id] || id, stockLeft: stock[id] ? Math.max(0, stock[id].left) : 0 }; }),
     unavailableSamples: unavailable.map(function (id) { return { id: id, name: names[id] || id }; }),

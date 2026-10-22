@@ -167,7 +167,7 @@ export async function handleApi(request, env, deps = {}) {
         requirePetPhotos: true, condoId: String(b.condoId || "").slice(0, 20), regId: String(b.regId || "").slice(0, 64),
         consent: b.consent === "YES" ? "YES" : "NO", promoOptIn: b.promoOptIn === "YES" ? "YES" : "NO",
         name: String(b.name || "").trim().slice(0, 80), mobile: String(b.mobile || "").slice(0, 20),
-        petType: String(b.petType || "").toUpperCase(), dog: clean(b.dog), cat: clean(b.cat)
+        petType: String(b.petType || "").toUpperCase(), dog: clean(b.dog), cat: clean(b.cat), building: String(b.building || "").trim().slice(0, 80)
       };
       if (["RP", "PG"].includes(payload.condoId.trim().toUpperCase()) &&
           Date.now() >= Date.parse("2026-10-24T17:00:00+08:00")) {

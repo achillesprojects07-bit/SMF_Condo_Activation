@@ -402,3 +402,21 @@ test("stores can be limited to the variants they carry", () => {
   assert.deepEqual(shop.has, ["MJ_ADULT_SALMON"]); assert.equal(shop.map, "https://maps.app.goo.gl/x");
 });
 
+
+test("compound QR (RP / Acacia Estates): resident must pick a listed condominium, saved as RESIDENT_CONDO", () => {
+  const g = fresh(); g.setNow('2026-10-22T02:00:00Z');
+  g.sheets.get('CONDOS').appendRow(['RP', 'Acacia Estates', 'Acacia Estates, Taguig', 'Rosewood Pointe Function Room', 'RP', 'ACTIVE']);
+  const sch = g.sheets.get('SCHEDULE'); if (sch.rows[0].length < 6) sch.rows[0].push('PREREG_OPEN'); sch.appendRow(['2026-10-24', 'RP', '', '09:00', '17:00', 'YES']);
+  const info = g.call('condo', { condoId: 'RP' });
+  assert.equal(info.condo.buildings.length, 10); assert.ok(info.condo.buildings.includes('Maple Place'));
+  assert.equal(g.call('condo', { condoId: 'RR' }).condo.buildings.length, 0);
+  const base = dogReg({ condoId: 'RP', mobile: '09170001111' });
+  assert.equal(g.call('register', base).error, 'BAD_BUILDING');
+  assert.equal(g.call('register', { ...base, building: 'Somewhere Else' }).error, 'BAD_BUILDING');
+  const ok = g.call('register', { ...base, building: 'maple place' });
+  assert.equal(ok.ok, true); assert.equal(ok.ticket.residentCondo, 'Maple Place'); assert.equal(ok.ticket.code, 'RP-0001');
+  assert.equal(g.table('REGISTRATIONS')[0].RESIDENT_CONDO, 'Maple Place');
+  // a normal condo QR does not need it
+  g.setNow('2026-10-10T02:00:00Z');
+  assert.equal(g.call('register', dogReg({ mobile: '09170002222' })).ok, true);
+});
