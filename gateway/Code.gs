@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.6-compound-buildings';
+var VERSION = '1.7-no-stock-claimable';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -368,6 +368,12 @@ function ticketView_(r, condo) {
   var names = {};
   products_().forEach(function (x) { names[x.PRODUCT_ID] = x.PRODUCT_NAME; });
   var samples = assignedSamples_(r), stock = stockFor_(r.CONDO_ID, r.DATE), unavailable = unavailableSamples_(r);
+  // A ticket saved as NO_STOCK (e.g. registered before the day's stock was entered) becomes claimable for any
+  // recorded variant that now has stock; the release itself still re-checks stock under the claim lock.
+  if (r.STATUS === 'NO_STOCK') {
+    var nowIn = unavailable.filter(function (id) { return stock[id] && stock[id].free > 0; });
+    samples = samples.concat(nowIn); unavailable = unavailable.filter(function (id) { return nowIn.indexOf(id) < 0; });
+  }
   return {
     code: r.CLAIM_CODE, date: r.DATE, registeredAt: r.REGISTERED_AT, status: r.STATUS,
     condoId: r.CONDO_ID, condoName: (condo && condo.CONDO_NAME) || r.CONDO_NAME, booth:condo ? condo.BOOTH_LOCATION || '' : '',
@@ -376,7 +382,7 @@ function ticketView_(r, condo) {
     samples: samples.map(function (id) { return { id: id, name: names[id] || id, stockLeft: stock[id] ? Math.max(0, stock[id].left) : 0 }; }),
     unavailableSamples: unavailable.map(function (id) { return { id: id, name: names[id] || id }; }),
     stores: storesFor_(r.CONDO_ID, samples.concat(unavailable)),
-    noStock: !!r.UNAVAILABLE_SAMPLES || [r.SAMPLE_DOG, r.SAMPLE_CAT].indexOf('NONE') >= 0,
+    noStock: r.STATUS === 'NO_STOCK' ? unavailable.length > 0 : (!!r.UNAVAILABLE_SAMPLES || [r.SAMPLE_DOG, r.SAMPLE_CAT].indexOf('NONE') >= 0),
     claimedAt: r.CLAIMED_AT || '', claimedBy: r.CLAIMED_BY || ''
   };
 }
@@ -465,7 +471,8 @@ function redeem_(p) {
   var products = {};
   products_().forEach(function (x) { products[x.PRODUCT_ID] = x; });
   var given = (p.products || []).filter(function (id, i, all) { return products[id] && all.indexOf(id) === i; });
-  if (reg && given.some(function (id) { return assignedSamples_(reg).indexOf(id) < 0; })) return { ok: false, error: 'UNASSIGNED_PRODUCT', message: 'Ibigay lang ang naka-assign sa ticket: isang pack bawat applicable variant.' };
+  var allowed = reg ? assignedSamples_(reg).concat(reg.STATUS === 'NO_STOCK' ? unavailableSamples_(reg) : []) : [];
+  if (reg && given.some(function (id) { return allowed.indexOf(id) < 0; })) return { ok: false, error: 'UNASSIGNED_PRODUCT', message: 'Ibigay lang ang naka-assign sa ticket: isang pack bawat applicable variant.' };
   var result = 'OK', note = '', unavailable = [], explicitOos = p.outOfStock === true;
   if (!reg) { result = 'UNKNOWN_CODE'; note = 'Ticket number not found'; }
   else if (reg.STATUS === 'CLAIMED') { result = 'DUPLICATE'; note = 'Already claimed ' + reg.CLAIMED_AT + ' by ' + reg.CLAIMED_BY; }

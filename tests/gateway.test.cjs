@@ -420,3 +420,15 @@ test("compound QR (RP / Acacia Estates): resident must pick a listed condominium
   g.setNow('2026-10-10T02:00:00Z');
   assert.equal(g.call('register', dogReg({ mobile: '09170002222' })).ok, true);
 });
+
+test("a ticket saved as NO_STOCK becomes claimable once the day's stock is added", () => {
+  const g = fresh();
+  const stock = g.sheets.get('STOCK'); stock.rows.splice(1); // no stock today
+  const t = g.call('register', dogReg({ mobile: '09170003333' }));
+  assert.equal(g.table('REGISTRATIONS')[0].STATUS, 'NO_STOCK');
+  for (const [id, n] of [['NC_PUPPY_LAMB', 24], ['NC_MAINT_ADULT', 111], ['NC_SMALL_BREED', 115], ['MJ_ADULT_SALMON', 250]]) stock.appendRow(['2026-10-10', 'RR', id, n]);
+  const v = g.call('ticket', { code: t.ticket.code }).ticket;
+  assert.deepEqual(v.samples.map(s => s.id), ['NC_SMALL_BREED']); assert.equal(v.noStock, false); assert.equal(v.unavailableSamples.length, 0);
+  const r = g.call('redeem', { redemptionId: 'ns-1', code: t.ticket.code, condoId: 'RR', staffCode: 'PM01', staffName: 'Princess Mabag', products: ['NC_SMALL_BREED'], photoConsent: 'NO' });
+  assert.equal(r.ok, true); assert.equal(g.table('REGISTRATIONS')[0].STATUS, 'CLAIMED');
+});
