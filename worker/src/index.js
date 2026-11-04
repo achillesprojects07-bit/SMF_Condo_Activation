@@ -59,17 +59,20 @@ export async function gateway(env, action, payload, fetchImpl = fetch) {
 }
 
 
-// Explicit closing deadlines for the October 24 events, matching SCHEDULE.
-// Compare the gateway's active event date so later events at the same condo stay independent.
+// Event-specific registration deadlines; later events remain independent.
+const REGISTRATION_DEADLINES = [
+  { ids: ["RP", "PG"], date: "2026-10-24", closesAt: "2026-10-24T17:00:00+08:00", message: "Registration closed at 5 PM on October 24, 2026." },
+  { ids: ["PT", "LE", "AS", "VR"], date: "2026-11-07", closesAt: "2026-11-07T17:15:00+08:00", message: "Registration closed at 5:15 PM on November 7, 2026." }
+];
 export function applyRegistrationClosing(info, condoId, now = Date.now()) {
   const id = String(condoId || info?.condo?.id || "").trim().toUpperCase();
   const eventDate = info?.eventDate || (info?.running ? info.date : "");
-  if (!info?.ok || !["RP", "PG"].includes(id) || eventDate !== "2026-10-24") return info;
-  const registrationClosesAt = "2026-10-24T17:00:00+08:00";
+  const rule = REGISTRATION_DEADLINES.find(r => r.ids.includes(id) && r.date === eventDate);
+  if (!info?.ok || !rule) return info;
+  const registrationClosesAt = rule.closesAt;
   if (now < Date.parse(registrationClosesAt)) return { ...info, registrationClosesAt };
   return { ...info, running: false, registrationOpen: false, preregistration: false,
-    registrationClosed: true, registrationClosesAt,
-    message: "Registration closed at 5 PM on October 24, 2026." };
+    registrationClosed: true, registrationClosesAt, message: rule.message };
 }
 
 /* ---------- signed tokens (HMAC-SHA256) ---------- */
@@ -169,8 +172,7 @@ export async function handleApi(request, env, deps = {}) {
         name: String(b.name || "").trim().slice(0, 80), mobile: String(b.mobile || "").slice(0, 20),
         petType: String(b.petType || "").toUpperCase(), dog: clean(b.dog), cat: clean(b.cat), building: String(b.building || "").trim().slice(0, 80)
       };
-      if (["RP", "PG"].includes(payload.condoId.trim().toUpperCase()) &&
-          Date.now() >= Date.parse("2026-10-24T17:00:00+08:00")) {
+      if (REGISTRATION_DEADLINES.some(r => r.ids.includes(payload.condoId.trim().toUpperCase()) && Date.now() >= Date.parse(r.closesAt))) {
         const event = applyRegistrationClosing(await gw("condo", { condoId: payload.condoId }), payload.condoId);
         if (event.registrationClosed) return json({ ok: false, error: "REGISTRATION_CLOSED", message: event.message }, 403);
       }
