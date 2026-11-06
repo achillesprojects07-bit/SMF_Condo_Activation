@@ -9,7 +9,7 @@
  */
 
 var TZ = 'Asia/Manila';
-var VERSION = '1.7-no-stock-claimable';
+var VERSION = '1.8-verified-registration-save';
 
 var TABLES = {
   CONDOS: ['CONDO_ID', 'CONDO_NAME', 'ADDRESS', 'BOOTH_LOCATION', 'CODE_PREFIX', 'STATUS'],
@@ -131,7 +131,15 @@ function headers_(name) {
 
 function append_(name, obj) {
   var h = headers_(name);
-  sheet_(name).appendRow(h.map(function (k) { return obj[k] === undefined ? '' : obj[k]; }));
+  var values = h.map(function (k) { return obj[k] === undefined ? '' : obj[k]; });
+  var sh = sheet_(name);
+  if (name !== 'REGISTRATIONS') { sh.appendRow(values); return; }
+  var rowNo = sh.getLastRow() + 1;
+  if (rowNo > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 1);
+  sh.getRange(rowNo, 1, 1, h.length).setValues([values]);
+  SpreadsheetApp.flush();
+  var saved = sh.getRange(rowNo, 1, 1, h.length).getValues()[0];
+  if (String(saved[h.indexOf('CLAIM_CODE')]) !== String(obj.CLAIM_CODE) || String(saved[h.indexOf('REG_ID')]) !== String(obj.REG_ID)) throw new Error('Registration save could not be verified. Please retry.');
 }
 
 function update_(name, rowNo, obj) {
