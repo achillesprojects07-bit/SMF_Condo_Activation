@@ -7,6 +7,8 @@ function makeSheet(name) {
   const sheet = {
     name, rows,
     getLastRow: () => rows.length,
+    getMaxRows: () => Math.max(1000, rows.length),
+    insertRowsAfter: () => { },
     getLastColumn: () => rows.reduce((m, r) => Math.max(m, r.length), 0),
     appendRow: r => { rows.push(r.slice()); return sheet; },
     getDataRange: () => ({ getValues: () => rows.map(r => { const w = sheet.getLastColumn(); const c = r.slice(); while (c.length < w) c.push(""); return c; }) }),
@@ -16,6 +18,7 @@ function makeSheet(name) {
       return {
         getValues: () => { const out = []; for (let i = 0; i < nr; i++) { const src = rows[row - 1 + i] || []; out.push(Array.from({ length: nc }, (_, j) => src[col - 1 + j] ?? "")); } return out; },
         setValue: v => { while (rows.length < row) rows.push([]); const r = rows[row - 1]; while (r.length < col) r.push(""); r[col - 1] = v; },
+        setValues: values => { for(let i=0;i<nr;i++){while(rows.length<row+i)rows.push([]);for(let j=0;j<nc;j++)rows[row-1+i][col-1+j]=values[i][j];} },
         setFontWeight: function () { return this; }, setBackground: function () { return this; }, setNumberFormat: function () { return this; }
       };
     },
