@@ -12,6 +12,16 @@
 
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
 const SESSION_HOURS = 16;
+
+// Four overnight training logins requested for November 6; Manila cutoff.
+const OVERNIGHT_DEMO_CODES = new Set(["DEMO-001", "DEMO-002", "DEMO-003", "DEMO-004"]);
+const OVERNIGHT_DEMO_END = Date.parse("2026-11-07T05:00:00+08:00");
+export function demoSessionExpiry(staffCode, now = Date.now()) {
+  const normalExpiry = now + SESSION_HOURS * 3600e3;
+  return OVERNIGHT_DEMO_CODES.has(String(staffCode || "").trim().toUpperCase())
+    ? Math.min(normalExpiry, OVERNIGHT_DEMO_END) : normalExpiry;
+}
+
 const MAX_PHOTO_CHARS = 1_500_000; // about 1.1 MB of JPEG; the BA app sends ~100-200 KB
 
 const hits = new Map(); // simple per-IP limiter (per Worker instance)
@@ -182,9 +192,10 @@ export async function handleApi(request, env, deps = {}) {
     if (path === "/api/staff/login" && method === "POST") {
       if (limited("login|" + ip, 10, 10 * 60 * 1000)) return json({ ok: false, error: "SLOW_DOWN", message: "Masyadong maraming mali. Maghintay ng 10 minuto." }, 429);
       const b = await body(request) || {};
+      if (demoSessionExpiry(b.staffCode) <= Date.now()) return json({ ok: false, error: "DEMO_EXPIRED", message: "Training access ended at 5:00 AM on November 7, 2026." }, 401);
       const r = await gw("staff_login", { staffCode: String(b.staffCode || "").slice(0, 20), pin: String(b.pin || "").slice(0, 8) });
       if (!r.ok) return json(r, 401);
-      const token = await signToken(sessionSecret(env), { role: "BA", staff: r.staff, condo: r.condo, exp: Date.now() + SESSION_HOURS * 3600e3 });
+      const token = await signToken(sessionSecret(env), { role: "BA", staff: r.staff, condo: r.condo, exp: demoSessionExpiry(r.staff.code) });
       return json({ ...r, token });
     }
 
@@ -212,7 +223,7 @@ export async function handleApi(request, env, deps = {}) {
 
     // Everything below needs a BA sign-in.
     const s = await readToken(sessionSecret(env), bearer(request));
-    if (!s || s.role !== "BA") return json({ ok: false, error: "SIGN_IN", message: "Mag-sign in ulit." }, 401);
+    if (!s || s.role !== "BA" || demoSessionExpiry(s.staff?.code) <= Date.now()) return json({ ok: false, error: "SIGN_IN", message: "Mag-sign in ulit." }, 401);
 
     if (path === "/api/ticket" && method === "GET") return json(await gw("ticket", { code: url.searchParams.get("code") || "" }));
     if (path === "/api/status" && method === "GET") return json(await gw("status", { condoId: s.condo.id }));
